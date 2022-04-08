@@ -1,89 +1,71 @@
 # Description: Generate reduced elevation topography
-# Author: Ruolan Xiang, November 2021
 
 # Load modules
 import xarray as xr
 from netCDF4 import Dataset
 from pyproj import CRS, Transformer
-from scipy.ndimage.interpolation import rotate
-import matplotlib.pyplot as plt
 import numpy as np
 import math
-from mpl_toolkits.axisartist.axislines import SubplotZero
-import cartopy.crs as ccrs
-import cartopy.feature as cfeature
+from pathlib import Path
 
 ###############################################################################
 # Settings
 ###############################################################################
 
 # Get files
-path = "/Users/rxiang/Desktop/topo/"
-src_file = 'GLOBE_H10.nc'
-tar_file = 'GLOBE_H10_reduced.nc'
-# src_file = 'GLOBE_H_filt_tukey_0.75_3.0_it4.nc'
-# tar_file = 'GLOBE_H_filt_tukey_0.75_3.0_it4_reduced1.nc'
-# src_file = 'GLOBE_H_filt_lanczos_window.nc'
-# tar_file = 'GLOBE_H_filt_lanczos_window_reduced1.nc'
-
-# open file
-ds = xr.open_dataset(path + src_file)
-HSURF = ds["altitude"].values
+path = "/Users/kaktus/Documents/ETH/BECCY/myscripts/topo/"
+#files = [path + i for i in ("MERIT_N60-N30_E060-E090.nc")]
+files = [path + i for i in ("MERIT_N60-N30_E060-E090.nc", "MERIT_N60-N30_E090-E120.nc",
+                            "MERIT_N30-N00_E060-E090.nc", "MERIT_N30-N00_E090-E120.nc")]
+ds = xr.open_mfdataset(files)
+elev = ds["Elevation"].values
 lat = ds["lat"].values
 lon = ds["lon"].values
 ds.close()
 
-HSURF_reduced = HSURF
+elev_reduced = elev
+ny, nx = elev_reduced.shape
 
-lon_0, lat_0 = lon[612], lat[2012]  # lon[1000], lat[2580]
+lon_0, lat_0 = 95.10000, 33.23000  # lon[612], lat[2012]  # lon = 95.10 lat = 33.23
 crs_wgs84 = CRS.from_epsg(4326)
 crs_aeqd = CRS.from_proj4("+proj=aeqd +lat_0=" + str(lat_0) + " +lon_0="
                           + str(lon_0) + " +datum=WGS84 +units=m")
 transformer = Transformer.from_crs(crs_wgs84, crs_aeqd, always_xy=True)
 lon_2d, lat_2d = np.meshgrid(lon, lat)
 x, y = transformer.transform(lon_2d, lat_2d)
-i = np.arrange(0, len(x[:, 0]))
-j = np.arrange(len(x[0, :]), 0)
 
-
-def compute_dis(rlon, rlat):
-    distance = np.sqrt(rlon ** 2 + rlat ** 2) / 1000.0
-    return distance
-
-
-azi = np.empty(np.shape(x))
-azi[i, j] = math.atan2(y[i, j], x[i, j])
-
+azi = np.arctan2(y, x)
 azi_deg = np.rad2deg(azi)
 azi45 = azi + np.pi / 4
 
+frac_azi = np.cos(azi45) ** 2
+frac_azi_mask = np.ma.masked_outside(frac_azi, -np.pi / 2, np.pi / 2)
 
-def compute_frac_azi(rlon, rlat):
-    if -np.pi / 2 <= azi45[rlon, rlat] <= np.pi / 2:
-        fraction = np.cos(azi45[rlon, rlat]) ** 2
-    else:
-        fraction = 0
-    return fraction
+distance = np.sqrt(x ** 2 + y ** 2) / 1000.0
+frac_dis = np.sin(distance / 1800 * np.pi) ** 2
+frac_dis_mask = np.ma.masked_greater(frac_dis, 1800)
 
-
-def compute_frac_dis(rlon, rlat):
-    if compute_dis(rlon, rlat) <= 1800:
-        fraction = np.sin(compute_dis(rlon, rlat) / 1800 * np.pi) ** 2
-    else:
-        fraction = 0
-    return fraction
-
-
-reduce = np.empty(np.shape(x))
-weight_dis = np.empty(np.shape(x))
-
+mask = np.ma.getmask(frac_azi_mask*frac_dis_mask)  # no change = True
 # compute reduce factor
-reduce[i, j] = compute_frac_azi(i, j) * compute_frac_dis(x[i][j], y[i][j]) * 0.75
+reduce_factor = frac_azi * frac_dis * 0.75
+elev_reduced = elev * (1 - reduce_factor*~mask)
 
-# compute redueced topography
-HSURF_reduced[i, j] = max(500, HSURF[i, j] * (1 - reduce[i, j]))
+# Set where the elevation was higher than 500 m and has been changed lower than 500 m to 500 m
+elev_diff = elev - elev_reduced
+mask = np.logical_and(elev_diff > 0.1, elev > 500, elev_reduced < 500)
+elev_reduced = np.ma.masked_array(elev_reduced, mask=mask)
 
+elev_reduced.filled(fill_value=500)
 
-tar_nc = Dataset(path + tar_file, 'a')
-tar_nc['altitude'][:] = HSURF_reduced[:]
-tar_nc.close()
+for p in Path(f'{path}').rglob('Reduced*'):
+    print(p.name)
+    ds = Dataset(path + p.name, 'a')
+    if p.name == 'Reduced_MERIT_N60-N30_E060-E090.nc':
+        ds['Elevation'][:] = elev_reduced[0:ny / 2, 0:nx / 2]
+    elif p.name == 'Reduced_MERIT_N60-N30_E090-E180.nc':
+        ds['Elevation'][:] = elev_reduced[0:ny / 2, nx / 2:]
+    elif p.name == 'Reduced_MERIT_N30-N00_E060-E90.nc':
+        ds['Elevation'][:] = elev_reduced[ny / 2:, 0:nx / 2]
+    else:
+        ds['Elevation'][:] = elev_reduced[ny / 2:, nx / 2:]
+    ds.close()

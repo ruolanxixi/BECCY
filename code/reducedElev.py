@@ -67,16 +67,18 @@ mask2 = np.ma.getmask(np.ma.masked_greater(elev_diff, 1)) * \
        np.ma.getmask(np.ma.masked_less(elev_reduced, 500))
 
 elev_reduced_modi = np.ma.masked_array(elev_reduced, mask=mask2)
-del elev, elev_diff, mask, elev_reduced
+del elev_diff, mask2, elev_reduced
+# del elev
 
 elev_reduced_modi = elev_reduced_modi.filled(fill_value=500)
+np.nan_to_num(elev_reduced_modi, nan=-32767)
 
 ds = Dataset(path + f"Reduced_{files}", 'a')
 ds['Elevation'][:] = elev_reduced_modi
 # ds['altitude'][:] = elev_reduced_modi
 ds.close()
 del ds
-del elev_reduced_modi
+# del elev_reduced_modi
 
 ###############################################################################
 # Plot
@@ -86,7 +88,7 @@ del elev_reduced_modi
 #
 # X = lat
 # Y = lon
-# Z = reduce_factor
+# Z = elev
 #
 # ax.plot(projection=ccrs.PlateCarree())
 #
@@ -94,7 +96,7 @@ del elev_reduced_modi
 #
 # ax.set_extent([90, 115, 15, 40], crs=ccrs.PlateCarree())
 # ax.add_feature(cfeature.LAND)
-# ax.add_feature(cfeature.OCEAN, zorder=100, edgecolor='k')
+# #ax.add_feature(cfeature.OCEAN, zorder=100, edgecolor='k')
 # ax.add_feature(cfeature.COASTLINE)
 # ax.add_feature(cfeature.BORDERS, linestyle=':')
 # ax.add_feature(cfeature.LAKES, alpha=0.5)

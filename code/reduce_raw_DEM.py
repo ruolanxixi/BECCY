@@ -16,8 +16,9 @@ import time
 # Terrain reduction settings
 lat_0, lon_0 = 33.23000, 95.10000  # reference location [degree]
 rad_red = 1800.0  # reduction radius [km]
+rad_red_ext = 300.0  # extend reduction radius at flat, amplitude maximum [km]
 alpha_0, alpha_1 = -135.0, 45.0  # measured anti-clockwise from East [degree]
-fac_amp = 0.75  # amplitude of terrain reduction
+fac_amp = 0.75  # 0.5  # 0.8  # 0.75  # amplitude of terrain reduction
 topo_min = 500.0  # minimal allowed elevation for terrain reduction
 
 # Map projection
@@ -43,22 +44,21 @@ fac_red_out = True  # output reduction factor
 
 # Determine required MERIT domain to load
 trans_cart2ellps = Transformer.from_crs(crs_aeqd, crs_wgs84, always_xy=True)
-fac_enl = 1.03  # "safety factor" to enlarge domain
-x_co = np.array([-rad_red, rad_red, rad_red, -rad_red], dtype=np.float32) \
-       * 1000.0 * fac_enl
-y_co = np.array([-rad_red, -rad_red, rad_red, rad_red], dtype=np.float32) \
-       * 1000.0 * fac_enl
-lon_co, lat_co = trans_cart2ellps.transform(x_co, y_co)
-print("Required DEM domain: " +
-      "longitude: %.2f" % lon_co.min() + " - %.2f" % lon_co.max() + " deg, "
-      + "latitude: %.2f" % lat_co.min() + " - %.2f" % lat_co.max() + " deg")
+fac_enl = 1.05  # "safety factor" to enlarge domain
+ang = np.linspace(0.0, 2.0 * np.pi, 100000)
+x_dom = (rad_red + rad_red_ext) * np.cos(ang) * 1000.0 * fac_enl
+y_dom = (rad_red + rad_red_ext) * np.sin(ang) * 1000.0 * fac_enl
+lon_dom, lat_dom = trans_cart2ellps.transform(x_dom, y_dom)
+print("Required rectangular DEM domain: " +
+      "longitude: %.2f" % lon_dom.min() + " - %.2f" % lon_dom.max() + " deg, "
+      + "latitude: %.2f" % lat_dom.min() + " - %.2f" % lat_dom.max() + " deg")
 
 # Check if DEM tiles cover required domain
 ds = xr.open_mfdataset([path_dem + i for i in tiles_dem])
-if (ds["lon"].values.min() >= lon_co.min()
-        or ds["lon"].values.max() <= lon_co.max()
-        or ds["lat"].values.min() >= lat_co.min()
-        or ds["lat"].values.max() <= lat_co.max()):
+if (ds["lon"].values.min() >= lon_dom.min()
+        or ds["lon"].values.max() <= lon_dom.max()
+        or ds["lat"].values.min() >= lat_dom.min()
+        or ds["lat"].values.max() <= lat_dom.max()):
     raise ValueError("provided DEM tiles do not cover required domain")
 ds.close()
 
@@ -70,8 +70,8 @@ for i in tiles_dem:
     # Load DEM data
     ds = xr.open_dataset(path_dem + i, mask_and_scale=False)
     lon_tile, lat_tile = ds["lon"].values, ds["lat"].values
-    ds = ds.sel(lon=slice(lon_co.min(), lon_co.max()),
-                lat=slice(lat_co.max(), lat_co.min()))
+    ds = ds.sel(lon=slice(lon_dom.min(), lon_dom.max()),
+                lat=slice(lat_dom.max(), lat_dom.min()))
     topo_fill_val = ds["Elevation"]._FillValue
     topo = ds["Elevation"].values  # 16-bit integer
     lon, lat = ds["lon"].values, ds["lat"].values
@@ -134,8 +134,19 @@ for i in tiles_dem:
     del x, y
 
     # Distance factor
-    fac_dist = np.sin(dist / rad_red * np.pi) ** 2
-    fac_dist[dist > rad_red] = 0.0
+    if rad_red_ext == 0.0:
+        fac_dist = np.sin(dist / rad_red * np.pi) ** 2
+        fac_dist[dist > rad_red] = 0.0
+    else:
+        fac_dist = np.zeros((ny, nx), dtype=np.float32)
+        mask = (dist <= rad_red / 2.0)
+        fac_dist[mask] = np.sin(dist[mask] / rad_red * np.pi) ** 2
+        mask = (dist > rad_red / 2.0) & (dist <= rad_red / 2.0 + rad_red_ext)
+        fac_dist[mask] = 1.0
+        mask = (dist > rad_red / 2.0 + rad_red_ext) \
+            & (dist <= rad_red + rad_red_ext)
+        fac_dist[mask] = np.sin((dist[mask] - rad_red_ext)
+                                / rad_red * np.pi) ** 2
     del dist
 
     # Azimuth factor (azimuth measured anti-clockwise from East)

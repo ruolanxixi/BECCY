@@ -198,17 +198,6 @@ y = rad * 1000.0 * np.sin(np.deg2rad(azim))
 lon_bound, lat_bound = trans_cart2ellps.transform(x, y)
 # -----------------------------------------------------------------------------
 
-# # Test plot
-# plt.figure()
-# plt.pcolormesh(lon_gc2009, lat_gc2009, mask_gc2009, shading="auto")
-# plt.colorbar()
-
-# Compute threshold elevations
-elev_thresh_gc20009 = int(np.round(np.nanmean(line_elev_mean[mask_gc2009])
-                                   / 10.0, decimals=0) * 10)
-elev_thresh_GAMDAM = int(np.round(data_GAMDAM[:, 2][mask_GAMDAM].mean()
-                                  / 10.0, decimals=0) * 10)
-
 # Colormaps
 levels_topo = np.arange(0.0, 6500.0, 500.0)
 cmap_topo = cm.grayC_r
@@ -237,11 +226,6 @@ ax.set_aspect("auto")
 plt.axis(map_ext)
 gl = ax.gridlines(draw_labels=True, linestyle="-", linewidth=0.0)
 gl.top_labels, gl.right_labels = False, False
-txt = "mean: ~" + str(elev_thresh_gc20009) + " m"
-t = plt.text(0.89, 0.95, txt, fontsize=12, fontweight="bold",
-             horizontalalignment="center", verticalalignment="center",
-             transform=ax.transAxes)
-t.set_bbox(dict(facecolor="white", alpha=0.75, edgecolor="none"))
 plt.title("Permanent snow/ice line (GlobCover 2009)", fontsize=12,
           fontweight="bold", y=1.01)
 # -----------------------------------------------------------------------------
@@ -262,11 +246,6 @@ ax.set_aspect("auto")
 plt.axis(map_ext)
 gl = ax.gridlines(draw_labels=True, linestyle="-", linewidth=0.0)
 gl.top_labels, gl.right_labels = False, False
-txt = "mean: ~" + str(elev_thresh_GAMDAM) + " m"
-t = plt.text(0.89, 0.95, txt, fontsize=12, fontweight="bold",
-             horizontalalignment="center", verticalalignment="center",
-             transform=ax.transAxes)
-t.set_bbox(dict(facecolor="white", alpha=0.75, edgecolor="none"))
 plt.title("Median glacier elevation (GAMDAM)", fontsize=12,
           fontweight="bold", y=1.01)
 # -----------------------------------------------------------------------------
@@ -276,8 +255,35 @@ cb = mpl.colorbar.ColorbarBase(ax, cmap=cmap_topo, norm=norm_topo,
 cb.ax.tick_params(labelsize=10)
 plt.title("[m]", fontsize=10, y=1.018, loc="left")
 # -----------------------------------------------------------------------------
-fig.savefig(path_out + "Snow_ice_threshold_elevation.png",
+fig.savefig(path_out + "Snow_ice_threshold_elevation_map.png",
             bbox_inches="tight", dpi=300)
+plt.close(fig)
+
+# Plot histogram
+fig = plt.figure(figsize=(12, 6))
+data = line_elev_mean[mask_gc2009]
+data = data[np.isfinite(data)]
+l0 = plt.hist(data, bins=30, density=True, color="blue", alpha=0.7, zorder=2)
+# for i in (10.0, 50.0, 90.0):  # percentiles
+for i in (5.0, 50.0, 95.0):  # percentiles
+    perc_value = np.percentile(data, i)
+    plt.vlines(perc_value, ymin=0.0, ymax=1.0, color="black",
+               lw=2.0, ls="-", zorder=3)
+    txt = "~" + str(int(np.round(perc_value / 10.0, decimals=0) * 10)) + " m"
+    plt.text(perc_value + 35.0, 0.0017, txt, fontsize=11, fontweight="bold")
+data = data_GAMDAM[:, 2][mask_GAMDAM]
+data = data[np.isfinite(data)]
+l1 = plt.hist(data, bins=30, density=True, color="darkgrey", alpha=0.3,
+              zorder=1)
+plt.axis([2500.0, 7000.0, 0.0, 0.0018])
+plt.xlabel("Elevation [m]")
+plt.ylabel("Density [-]")
+plt.title("Distribution of permanent snow/ice line and glacier median "
+          + "elevation", fontsize=13, fontweight="bold", y=1.01)
+plt.legend([l0[-1], l1[-1]], ["GlobCover 2009", "GAMDAM"], loc="upper right",
+           fontsize=12, frameon=False)
+fig.savefig(path_out + "Snow_ice_threshold_elevation_histogram.pdf",
+            bbox_inches="tight")
 plt.close(fig)
 
 # Notes

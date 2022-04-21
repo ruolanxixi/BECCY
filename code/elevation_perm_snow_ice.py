@@ -175,28 +175,28 @@ for i in range(labels.shape[0]):
         if labels[i, j] > 0:
             line_elev_mean[i, j] = grad_mean[labels[i, j] - 1]
 
-# Masks for south-eastern region
-# -----------------------------------------------------------------------------
-lon, lat = np.meshgrid(lon_gc2009, lat_gc2009)
-trans_ellps2cart = Transformer.from_crs(crs_wgs84, crs_aeqd, always_xy=True)
-x, y = trans_ellps2cart.transform(lon, lat)
-azim = np.rad2deg(np.arctan2(y, x))  # [degree]
-mask_gc2009 = (azim >= -135.0) & (azim <= 45.0)
-# -----------------------------------------------------------------------------
-trans_ellps2cart = Transformer.from_crs(crs_wgs84, crs_aeqd, always_xy=True)
-x, y = trans_ellps2cart.transform(data_GAMDAM[:, 0], data_GAMDAM[:, 1])
-azim = np.rad2deg(np.arctan2(y, x))  # [degree]
-mask_GAMDAM = (azim >= -135.0) & (azim <= 45.0)
-# -----------------------------------------------------------------------------
-trans_cart2ellps = Transformer.from_crs(crs_aeqd, crs_wgs84, always_xy=True)
-num = 500
-rad = np.concatenate([np.linspace(1000.0, 0.0, num),
-                      np.linspace(0.0, 1000.0, num)])  # [km]
-azim = np.concatenate([np.repeat(-135.0, num), np.repeat(45.0, num)])
-x = rad * 1000.0 * np.cos(np.deg2rad(azim))
-y = rad * 1000.0 * np.sin(np.deg2rad(azim))
-lon_bound, lat_bound = trans_cart2ellps.transform(x, y)
-# -----------------------------------------------------------------------------
+# # Masks for south-eastern region
+# # ---------------------------------------------------------------------------
+# lon, lat = np.meshgrid(lon_gc2009, lat_gc2009)
+# trans_ellps2cart = Transformer.from_crs(crs_wgs84, crs_aeqd, always_xy=True)
+# x, y = trans_ellps2cart.transform(lon, lat)
+# azim = np.rad2deg(np.arctan2(y, x))  # [degree]
+# mask_gc2009 = (azim >= -135.0) & (azim <= 45.0)
+# # ---------------------------------------------------------------------------
+# trans_ellps2cart = Transformer.from_crs(crs_wgs84, crs_aeqd, always_xy=True)
+# x, y = trans_ellps2cart.transform(data_GAMDAM[:, 0], data_GAMDAM[:, 1])
+# azim = np.rad2deg(np.arctan2(y, x))  # [degree]
+# mask_GAMDAM = (azim >= -135.0) & (azim <= 45.0)
+# # ---------------------------------------------------------------------------
+# trans_cart2ellps = Transformer.from_crs(crs_aeqd, crs_wgs84, always_xy=True)
+# num = 500
+# rad = np.concatenate([np.linspace(1000.0, 0.0, num),
+#                       np.linspace(0.0, 1000.0, num)])  # [km]
+# azim = np.concatenate([np.repeat(-135.0, num), np.repeat(45.0, num)])
+# x = rad * 1000.0 * np.cos(np.deg2rad(azim))
+# y = rad * 1000.0 * np.sin(np.deg2rad(azim))
+# lon_bound, lat_bound = trans_cart2ellps.transform(x, y)
+# # ---------------------------------------------------------------------------
 
 # Colormaps
 levels_topo = np.arange(0.0, 6500.0, 500.0)
@@ -209,19 +209,19 @@ norm = mpl.colors.BoundaryNorm(levels, ncolors=cmap.N, extend="both")
 
 # Plot maps
 map_ext = [90.0, 104.8, 26.7, 35.0]
-fig = plt.figure(figsize=(11.0, 16.0))
-gs = gridspec.GridSpec(2, 2, left=0.1, bottom=0.1, right=0.9,
-                       top=0.9, hspace=0.12, wspace=0.04,
-                       width_ratios=[1, 0.03])
+fig = plt.figure(figsize=(10.0, 17.5))
+gs = gridspec.GridSpec(7, 1, left=0.1, bottom=0.1, right=0.9,
+                       top=0.9, hspace=0.15, wspace=0.04,
+                       height_ratios=[1, 0.01, 1, 0.003, 0.025, 0.01, 0.025])
 # -----------------------------------------------------------------------------
-ax = plt.subplot(gs[0, 0], projection=ccrs.PlateCarree())
+ax = plt.subplot(gs[0], projection=ccrs.PlateCarree())
 plt.pcolormesh(lon_gc2009, lat_gc2009, topo_gc2009, cmap=cmap_topo,
                norm=norm_topo, shading="auto")
 data_plot = np.ma.masked_where(np.isnan(line_elev_mean), line_elev_mean)
 plt.pcolormesh(lon_gc2009, lat_gc2009, data_plot, cmap=cmap, norm=norm,
                shading="auto")
-plt.plot(lon_bound, lat_bound, lw=1.5, color="black", linestyle="--")
-plt.scatter(lon_0, lat_0, color="black", s=50)
+# plt.plot(lon_bound, lat_bound, lw=1.5, color="black", linestyle="--")
+# plt.scatter(lon_0, lat_0, color="black", s=50)
 ax.set_aspect("auto")
 plt.axis(map_ext)
 gl = ax.gridlines(draw_labels=True, linestyle="-", linewidth=0.0)
@@ -229,19 +229,13 @@ gl.top_labels, gl.right_labels = False, False
 plt.title("Permanent snow/ice line (GlobCover 2009)", fontsize=12,
           fontweight="bold", y=1.01)
 # -----------------------------------------------------------------------------
-ax = plt.subplot(gs[0, 1])
-cb = mpl.colorbar.ColorbarBase(ax, cmap=cmap, norm=norm,
-                               orientation="vertical")
-cb.ax.tick_params(labelsize=10)
-plt.title("[m]", fontsize=10, y=1.018, loc="left")
-# -----------------------------------------------------------------------------
-ax = plt.subplot(gs[1, 0], projection=ccrs.PlateCarree())
+ax = plt.subplot(gs[2], projection=ccrs.PlateCarree())
 plt.pcolormesh(lon_gc2009, lat_gc2009, topo_gc2009, cmap=cmap_topo,
                norm=norm_topo, shading="auto")
 plt.scatter(data_GAMDAM[:, 0], data_GAMDAM[:, 1], c=data_GAMDAM[:, 2],
             cmap=cmap, norm=norm, s=15)
-plt.plot(lon_bound, lat_bound, lw=1.5, color="black", linestyle="--")
-plt.scatter(lon_0, lat_0, color="black", s=50)
+# plt.plot(lon_bound, lat_bound, lw=1.5, color="black", linestyle="--")
+# plt.scatter(lon_0, lat_0, color="black", s=50)
 ax.set_aspect("auto")
 plt.axis(map_ext)
 gl = ax.gridlines(draw_labels=True, linestyle="-", linewidth=0.0)
@@ -249,11 +243,18 @@ gl.top_labels, gl.right_labels = False, False
 plt.title("Median glacier elevation (GAMDAM)", fontsize=12,
           fontweight="bold", y=1.01)
 # -----------------------------------------------------------------------------
-ax = plt.subplot(gs[1, 1])
-cb = mpl.colorbar.ColorbarBase(ax, cmap=cmap_topo, norm=norm_topo,
-                               orientation="vertical")
+ax = plt.subplot(gs[4])
+cb = mpl.colorbar.ColorbarBase(ax, cmap=cmap, norm=norm,
+                               orientation="horizontal")
 cb.ax.tick_params(labelsize=10)
-plt.title("[m]", fontsize=10, y=1.018, loc="left")
+plt.xlabel("Permanent snow/ice line or median glacier elevation[m]",
+           fontsize=10)
+# -----------------------------------------------------------------------------
+ax = plt.subplot(gs[6])
+cb = mpl.colorbar.ColorbarBase(ax, cmap=cmap_topo, norm=norm_topo,
+                               orientation="horizontal")
+cb.ax.tick_params(labelsize=10)
+plt.xlabel("Terrain elevation [m]", fontsize=10)
 # -----------------------------------------------------------------------------
 fig.savefig(path_out + "Snow_ice_threshold_elevation_map.png",
             bbox_inches="tight", dpi=300)
@@ -261,7 +262,7 @@ plt.close(fig)
 
 # Plot histogram
 fig = plt.figure(figsize=(12, 6))
-data = line_elev_mean[mask_gc2009]
+data = line_elev_mean  # [mask_gc2009]
 data = data[np.isfinite(data)]
 l0 = plt.hist(data, bins=30, density=True, color="blue", alpha=0.7, zorder=2)
 # for i in (10.0, 50.0, 90.0):  # percentiles
@@ -271,7 +272,7 @@ for i in (5.0, 50.0, 95.0):  # percentiles
                lw=2.0, ls="-", zorder=3)
     txt = "~" + str(int(np.round(perc_value / 10.0, decimals=0) * 10)) + " m"
     plt.text(perc_value + 35.0, 0.0017, txt, fontsize=11, fontweight="bold")
-data = data_GAMDAM[:, 2][mask_GAMDAM]
+data = data_GAMDAM[:, 2]  # [mask_GAMDAM]
 data = data[np.isfinite(data)]
 l1 = plt.hist(data, bins=30, density=True, color="darkgrey", alpha=0.3,
               zorder=1)

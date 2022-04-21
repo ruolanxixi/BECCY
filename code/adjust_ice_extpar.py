@@ -19,25 +19,28 @@ mpl.style.use("classic")
 ###############################################################################
 
 # Elevation threshold for permanent snow/ice coverage
-elev_thresh = [3800.0, 4640.0, 5200.0]  # percentiles (5.0, 50.0, 95.0) [m]
+elev_thresh = [3810.0, 4640.0, 5490.0]  # percentiles (5.0, 50.0, 95.0) [m]
 
 # Directions to adjust
 adj_ice2soil = True
 adj_soil2ice = False
 
 # EXTPAR files
-file_ref = "/Users/csteger/Desktop/extpar_BECCY_4.4km_merit_unmod_topo.nc"
-file_mod = "/Users/csteger/Desktop/extpar_BECCY_4.4km_merit_reduced_topo.nc"
+# file_ref = "/Users/csteger/Desktop/extpar_BECCY_4.4km_merit_unmod_topo.nc"
+# file_mod = "/Users/csteger/Desktop/extpar_BECCY_4.4km_merit_reduced_topo.nc"
+file_ref = "/Users/csteger/Desktop/extpar_EAS_ext_12km_merit_unmod_topo.nc"
+file_mod = "/Users/csteger/Desktop/extpar_EAS_ext_12km_merit_reduced_topo.nc"
 
 # Search radius for (nearest) neighbour grid cells
-rad_search = 25.0 * 1000.0  # [m]
+# rad_search = 60.0 * 1000.0  # [m] (4.4 km EXTPAR file)
+rad_search = 90.0 * 1000.0  # [m] (12 km EXTPAR file)
 
 ###############################################################################
 # Adjust EXTPAR file
 ###############################################################################
 
 # Find variable fields that differ between EXTPAR files
-print(" Differing variable fields " .center(79, "-"))
+print(" Variable fields that differ " .center(79, "-"))
 ds = xr.open_dataset(file_ref)
 ds_mod = xr.open_dataset(file_mod)
 for i in list(ds.variables):
@@ -52,6 +55,7 @@ ds = xr.open_dataset(file_ref)
 topo_unmod = ds["HSURF"].values
 fr_land = ds["FR_LAND"].values
 soiltyp = ds["SOILTYP"].values
+ice = ds["ICE"].values
 lon = ds["lon"].values  # [degree]
 lat = ds["lat"].values  # [degree]
 ds.close()
@@ -59,9 +63,10 @@ ds = xr.open_dataset(file_mod)
 topo_mod = ds["HSURF"].values
 ds.close()
 
-# Find grid cells that must be adjusted
+# Find adjustable grid cells
 mask_mod = (np.abs(topo_unmod - topo_mod) > 0.001)
-mask_ice2soil = (mask_mod & (soiltyp == 1.0) & (topo_mod < elev_thresh[0]))
+# mask_ice2soil = (mask_mod & (soiltyp == 1.0) & (topo_mod < elev_thresh[0]))
+mask_ice2soil = (mask_mod & (ice > 0.0) & (topo_mod < elev_thresh[0]))
 print("Number of grid cells (ice2soil): " + str(mask_ice2soil.sum()))
 mask_soil2ice = (mask_mod & (soiltyp != 1.0) & (topo_mod > elev_thresh[2]))
 print("Number of grid cells (soil2ice): " + str(mask_soil2ice.sum()))
@@ -106,7 +111,7 @@ print("-" * 79)
 # - FOR_D, FOR_E
 # - SKC
 # - ROOTDP
-# - NDIV_MAX
+# - NDVI_MAX
 # - SOILTYP
 # - LU_CLASS_FRACTION (size: 23)
 # - ALB_DIF12, ALNID12, ALUVD12, NDVI, NDVI_MRAT (size: 12)
@@ -156,6 +161,7 @@ if adj_ice2soil:
 
         # Mask with ice/glacier (1) and water (9) grid cells
         mask_soil = (soiltyp.ravel()[ind_lin] == 1.0) \
+            | (ice.ravel()[ind_lin] > 0.0) \
             | (soiltyp.ravel()[ind_lin] == 9.0)
         frac_diff_abs = np.abs(fr_land.ravel()[ind_lin] - fr_land[ind_2d_ta])
         frac_diff_abs[mask_soil] = np.nan
@@ -186,16 +192,30 @@ if adj_ice2soil:
 # Derive grid cell replacement indices for soil -> ice
 # -----------------------------------------------------------------------------
 
+# To do..
+
 # -----------------------------------------------------------------------------
 # Adjust EXTPAR file
 # -----------------------------------------------------------------------------
 
+# Variables that are replaced
+var_rep = {"2d": ("ICE", "PLCOV_MN", "PLCOV_MX", "LAI_MN", "LAI_MX",
+                  "EMIS_RAD", "RSMIN", "URBAN", "FOR_D", "FOR_E",
+                  "SKC", "ROOTDP", "NDVI_MAX", "SOILTYP",
+                  "FR_LAND", "FR_LAKE", "DEPTH_LK"),
+           "3d": ("LU_CLASS_FRACTION",
+                  "ALB_DIF12", "ALNID12", "ALUVD12", "NDVI", "NDVI_MRAT")}
 
 # Load data from EXTPAR files
-ds_ref = xr.open_dataset(file_ref)
-ds_mod = xr.open_dataset(file_mod)
-
-# topo_unmod = ds["HSURF"].values
-
-ds_mod.to_netcdf()
-ds_ref.close()
+ds = xr.open_dataset(file_mod)
+for i in var_rep["2d"]:
+    ds[i].values[ind_ta[0], ind_ta[1]] = ds[i].values[ind_su[0], ind_su[1]]
+for i in var_rep["3d"]:
+    ds[i].values[:, ind_ta[0], ind_ta[1]] \
+        = ds[i].values[:, ind_su[0], ind_su[1]]
+ds.to_netcdf(file_mod[:-3] + "_adj.nc", format="NETCDF4",
+             encoding={"time": {"_FillValue": None},
+                       "mlev": {"_FillValue": None}})
+# significant difference in created EXTPAR file:
+# - new dimension "string1 = 1 ;"
+# - char rotated_pole ; -> char rotated_pole(string1) ;

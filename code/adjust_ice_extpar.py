@@ -1,5 +1,5 @@
-# Description: Adjust grid cells covered with permanent snow/ice to modified
-#              topography (also adapt linked fields!)
+# Description: Adjust grid cells covered with permanent snow/ice according to
+#              modified topography (also adapt linked fields)
 #
 # Authors: Ruolan Xiang, Christian R. Steger, IAC ETH Zurich
 
@@ -8,6 +8,8 @@ import xarray as xr
 import numpy as np
 import matplotlib as mpl
 import matplotlib.pyplot as plt
+from pyproj import CRS, Transformer
+from scipy.spatial import cKDTree
 # from netCDF4 import Dataset
 
 mpl.style.use("classic")
@@ -27,8 +29,8 @@ adj_soil2ice = False
 file_ref = "/Users/csteger/Desktop/extpar_BECCY_4.4km_merit_unmod_topo.nc"
 file_mod = "/Users/csteger/Desktop/extpar_BECCY_4.4km_merit_reduced_topo.nc"
 
-# Window size for searching (nearest) neighbour
-wind = 10  # 10 -> (10 + 1 + 10) -> 21 x 21 [-]
+# Search radius for (nearest) neighbour grid cells
+rad_search = 25.0 * 1000.0  # [m]
 
 ###############################################################################
 # Adjust EXTPAR file
@@ -45,15 +47,16 @@ ds.close()
 ds_mod.close()
 print("-" * 79)
 
-# Load file with unmodified topography
+# Load data from EXTPAR files
 ds = xr.open_dataset(file_ref)
 topo_unmod = ds["HSURF"].values
 fr_land = ds["FR_LAND"].values
+soiltyp = ds["SOILTYP"].values
+lon = ds["lon"].values  # [degree]
+lat = ds["lat"].values  # [degree]
 ds.close()
-
 ds = xr.open_dataset(file_mod)
 topo_mod = ds["HSURF"].values
-soiltyp = ds["SOILTYP"].values
 ds.close()
 
 # Find grid cells that must be adjusted
@@ -64,13 +67,17 @@ mask_soil2ice = (mask_mod & (soiltyp != 1.0) & (topo_mod > elev_thresh[2]))
 print("Number of grid cells (soil2ice): " + str(mask_soil2ice.sum()))
 
 # Statistics for grid cells that have to be adjusted
-print(" Statistics of grid cells that have to be adjusted " .center(79, "-"))
+print(" Statistics of adjusted grid cells with water fraction "
+      .center(79, "-"))
 mask = np.zeros(topo_unmod.shape, dtype=bool)
 if adj_ice2soil:
     mask[mask_ice2soil] = True
 if adj_soil2ice:
     mask[mask_soil2ice] = True
 print("Minimal FR_LAND value: %.3f" % fr_land[mask].min())
+num = (fr_land[mask] != 1.0).sum()
+print("Number of grid cells for which FR_LAND != 1.0: " + str(num)
+      + " (%.2f" % (num / mask.sum() * 100.0) + " %)")
 print("Number of grid cells for which FR_LAND < 0.99: "
       + str((fr_land[mask] < 0.99).sum()))
 print("-" * 79)
@@ -79,15 +86,15 @@ print("-" * 79)
 # Notes for adjusting values
 # -----------------------------------------------------------------------------
 
-# Values not adjusted -> depend on elevation (9)
+# Not adjusted -> depend on elevation (9)
 # - HSURF, FIS
 # - S_ORO, Z0, T_CL
 # - SSO_STDH, SSO_THETA, SSO_GAMMA, SSO_SIGMA
 
-# Values not adjusted -> fixed (2)
+# Not adjusted -> fixed (2)
 # - lon, lat
 
-# Values not adjusted -> atmosphere (5)
+# Not adjusted -> atmospheric column (5)
 # - AER_BC12, AER_DUST12, AER_ORG12, AER_SO412, AER_SS12 (size: 12)
 
 # Values adjusted -> depend on surface/soil (23)
@@ -110,73 +117,85 @@ print("-" * 79)
 # - also replace water/lake properties to keep grid data consistent
 
 # -----------------------------------------------------------------------------
-# Adjust EXTPAR fields (ice -> soil)
+
+# Compute ECEF coordinates and construct tree
+crs_ecef = CRS.from_dict({"proj": "geocent", "ellps": "sphere"})
+crs_latlon = CRS.from_dict({"proj": "latlong", "ellps": "sphere"})
+trans = Transformer.from_crs(crs_latlon, crs_ecef, always_xy=True)
+x_ecef, y_ecef, z_ecef = trans.transform(lon, lat, np.zeros_like(lon))
+pts_gc = np.vstack((x_ecef.ravel(), y_ecef.ravel(), z_ecef.ravel())) \
+    .transpose()
+tree = cKDTree(pts_gc)
+
 # -----------------------------------------------------------------------------
-
-# Distance array
-x = np.arange(topo_unmod.shape[1], dtype=np.float32)
-y = np.arange(topo_unmod.shape[0], dtype=np.float32)
-x, y = np.meshgrid(x, y)
-
+# Derive grid cell replacement indices for ice -> soil
+# -----------------------------------------------------------------------------
 if adj_ice2soil:
 
-    indices = zip(*np.where(mask_ice2soil))
-    for i, j in indices:
+    # Indices for replacement (source -> target)
+    num = mask_ice2soil.sum()
+    ind_ta = np.where(mask_ice2soil)
+    ind_su = (np.empty(num, dtype=np.int32), np.empty(num, dtype=np.int32))
+    dist_all = np.empty(num, dtype=np.float32)
+    frac_diff_all = np.empty(num, dtype=np.float32)
+    for i in range(num):
 
-        slic = (slice(i - wind, i + wind + 1), slice(j - wind, j + wind + 1))
-        frac_diff_abs = np.abs(fr_land[slic] - fr_land[i, j])  # [-]
-        mask = (soiltyp[slic] != 1.0) \
-            & (frac_land_diff == frac_land_diff.min())
-        dist_sqrt = (x[i, j] - x[slic]) ** 2 + (y[i, j] - y[slic]) ** 2
-        dist_sqrt[~mask] = np.nan
-        ind_0, ind_1 = np.where(dist_sqrt == np.nanmin(dist_sqrt))
-        i_rep, j_rep = ind_0[0] + i, ind_1[0] + j
+        ind_2d_ta = (ind_ta[0][i], ind_ta[1][i])
+        ind_lin = tree.query_ball_point([x_ecef[ind_2d_ta],
+                                         y_ecef[ind_2d_ta],
+                                         z_ecef[ind_2d_ta]],
+                                        r=rad_search)  # linear indices
+        dist = np.sqrt((x_ecef.ravel()[ind_lin] - x_ecef[ind_2d_ta]) ** 2
+                       + (y_ecef.ravel()[ind_lin] - y_ecef[ind_2d_ta]) ** 2
+                       + (z_ecef.ravel()[ind_lin] - z_ecef[ind_2d_ta]) ** 2)
+        # chord length [m]
 
+        # print(ind_2d_ta)
+        # for ind, j in enumerate(ind_lin):
+        #     print(j // lon.shape[1], j % lon.shape[1], dist[ind])
 
-ds = xr.open_dataset(file_ref)
-fr_land = ds["FR_LAND"].values
-ice = ds["ICE"].values
-ds.close()
+        # Mask with ice/glacier (1) and water (9) grid cells
+        mask_soil = (soiltyp.ravel()[ind_lin] == 1.0) \
+            | (soiltyp.ravel()[ind_lin] == 9.0)
+        frac_diff_abs = np.abs(fr_land.ravel()[ind_lin] - fr_land[ind_2d_ta])
+        frac_diff_abs[mask_soil] = np.nan
+        mask_frac = (frac_diff_abs == np.nanmin(frac_diff_abs))
+        dist[~mask_frac] = np.nan
+        ind_sel = np.nanargmin(dist)
 
+        ind_su[0][i] = ind_lin[ind_sel] // lon.shape[1]
+        ind_su[1][i] = ind_lin[ind_sel] % lon.shape[1]
+        dist_all[i] = dist[ind_sel]
+        frac_diff_all[i] = fr_land.ravel()[ind_lin[ind_sel]] \
+            - fr_land[ind_2d_ta]
 
+    print(" Statistics (ice -> soil) ".center(79, "-"))
+    print("Mean distance: %.0f" % dist_all.mean() + " m")
+    print("95th percentile distance: %.0f" % np.percentile(dist_all, 95.0)
+          + " m")
+    print("Maximal distance: %.0f" % dist_all.max() + " m")
+    print("Differences in FR_LAND (min, max, mean): "
+          + "%.3f" % frac_diff_all.min() + ", %.3f" % frac_diff_all.max()
+          + ", %.5f" % frac_diff_all.mean())
+    print("Range of soil types used for replacing ice: "
+          + str(int(soiltyp[ind_su[0], ind_su[1]].min()))
+          + " - " + str(int(soiltyp[ind_su[0], ind_su[1]].max())))
+    print("-" * 79)
 
-ice = ds["ICE"].values
-soiltyp = ds["SOILTYP"].values
+# -----------------------------------------------------------------------------
+# Derive grid cell replacement indices for soil -> ice
+# -----------------------------------------------------------------------------
 
-var = "SKC"
-print(ds[var].values[soiltyp == 1].min(), ds[var].values[soiltyp == 1].max())
-
-ds.close()
-
-
-
+# -----------------------------------------------------------------------------
+# Adjust EXTPAR file
 # -----------------------------------------------------------------------------
 
 
-# Read EXTPAR file
-Path = "/project/pr94/rxiang/data/extpar/"
-file = "extpar_12km_878x590_topo1_original.nc"
-ds = xr.open_dataset(Path + file)
-elev_topo = ds["HSURF"].values
-ice_topo = ds["ICE"].values
-ds.close()
+# Load data from EXTPAR files
+ds_ref = xr.open_dataset(file_ref)
+ds_mod = xr.open_dataset(file_mod)
 
-file = "extpar_12km_878x590.nc"
-ds = xr.open_dataset(Path + file)
-elev_ctrl = ds["HSURF"].values
-lat = ds["lat"].values
-lon = ds["lon"].values
-ds.close()
+# topo_unmod = ds["HSURF"].values
 
-elev_diff = elev_ctrl - elev_topo
-elev_mask = elev_topo
-elev_mask = np.ma.masked_where(elev_diff < 0.1, elev_mask)
-elev_mask = np.ma.masked_where(elev_mask > 2500, elev_mask)
-
-mask = np.ma.getmask(elev_mask)
-ice_topo = ice_topo * mask
-
-file = "extpar_12km_878x590_topo1.nc"
-tar = Dataset(Path + file, 'a')
-tar['ICE'][:] = ice_topo[:]
-tar.close()
+ds_mod.to_netcdf()
+ds_ref.close()

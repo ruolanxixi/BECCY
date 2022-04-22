@@ -1,5 +1,7 @@
-# Description: Adjust grid cells covered with permanent snow/ice according to
-#              modified topography (also adapt linked fields)
+# Description: Adjust vertically shifted grid cells according to the regional
+#              elevation line of permanent snow/ice coverage. Grid cells are
+#              replaced with nearest neighbours respectively with cells that
+#              have the most similar land fraction.
 #
 # Authors: Ruolan Xiang, Christian R. Steger, IAC ETH Zurich
 
@@ -32,8 +34,7 @@ file_ref = "/Users/csteger/Desktop/extpar_EAS_ext_12km_merit_unmod_topo.nc"
 file_mod = "/Users/csteger/Desktop/extpar_EAS_ext_12km_merit_reduced_topo.nc"
 
 # Search radius for (nearest) neighbour grid cells
-# rad_search = 60.0 * 1000.0  # [m] (4.4 km EXTPAR file)
-rad_search = 90.0 * 1000.0  # [m] (12 km EXTPAR file)
+rad_search = 50.0 * 1000.0  # [m]
 
 ###############################################################################
 # Adjust EXTPAR file
@@ -48,14 +49,15 @@ for i in list(ds.variables):
         print((i + ":").ljust(12) + ds[i].long_name)
 ds.close()
 ds_mod.close()
-print("-" * 79)
 
 # Load data from EXTPAR files
 ds = xr.open_dataset(file_ref)
 topo_unmod = ds["HSURF"].values
 fr_land = ds["FR_LAND"].values
 soiltyp = ds["SOILTYP"].values
-ice = ds["ICE"].values
+alb_dif12 = ds["ALB_DIF12"].values
+alnid12 = ds["ALNID12"].values
+aluvd12 = ds["ALUVD12"].values
 lon = ds["lon"].values  # [degree]
 lat = ds["lat"].values  # [degree]
 ds.close()
@@ -63,10 +65,33 @@ ds = xr.open_dataset(file_mod)
 topo_mod = ds["HSURF"].values
 ds.close()
 
+# Check available soil types in data
+print(" Occurring soil types in EXTPAR file " .center(79, "-"))
+soil_types_tc = {1: "ice and glacier", 2: "rock, lithosols", 3: "sand",
+                 4: "sandy loam", 5: "loam (default soil type)",
+                 6: "loamy clay", 7: "clay", 8: "histosols (peat)",
+                 9: "water", 10: "alkali flat", 11: "shifting sand, dunes",
+                 12: "urban, human disturbed", 255: "unknown"}
+for i in np.unique(soiltyp.astype(int)):
+    print(str(i).ljust(2) + ": " + soil_types_tc[i])
+
+# Check consistency of soiltyp == 1 (ice and glacier) and albedo values
+if (np.any(np.diff((alb_dif12 == 0.7), axis=0))
+        or np.any(np.diff((alnid12 == 0.7), axis=0))
+        or np.any(np.diff((aluvd12 == 0.7), axis=0))):
+    raise ValueError("Albedo values of glaciated area temporally inconsistent")
+arr_bool = np.concatenate((soiltyp[np.newaxis, :, :] == 1.0,
+                           alb_dif12[:1, :, :] == 0.7,
+                           alnid12[:1, :, :] == 0.7,
+                           aluvd12[:1, :, :] == 0.7), axis=0)
+if np.any(np.diff(arr_bool, axis=0)):
+    raise ValueError("Fields of 'soiltyp == 1' and albedo are spatially "
+                     + "inconsistent")
+
 # Find adjustable grid cells
+print("-" * 79)
 mask_mod = (np.abs(topo_unmod - topo_mod) > 0.001)
-# mask_ice2soil = (mask_mod & (soiltyp == 1.0) & (topo_mod < elev_thresh[0]))
-mask_ice2soil = (mask_mod & (ice > 0.0) & (topo_mod < elev_thresh[0]))
+mask_ice2soil = (mask_mod & (soiltyp == 1.0) & (topo_mod < elev_thresh[0]))
 print("Number of grid cells (ice2soil): " + str(mask_ice2soil.sum()))
 mask_soil2ice = (mask_mod & (soiltyp != 1.0) & (topo_mod > elev_thresh[2]))
 print("Number of grid cells (soil2ice): " + str(mask_soil2ice.sum()))
@@ -85,7 +110,6 @@ print("Number of grid cells for which FR_LAND != 1.0: " + str(num)
       + " (%.2f" % (num / mask.sum() * 100.0) + " %)")
 print("Number of grid cells for which FR_LAND < 0.99: "
       + str((fr_land[mask] < 0.99).sum()))
-print("-" * 79)
 
 # -----------------------------------------------------------------------------
 # Notes for adjusting values
@@ -102,8 +126,7 @@ print("-" * 79)
 # Not adjusted -> atmospheric column (5)
 # - AER_BC12, AER_DUST12, AER_ORG12, AER_SO412, AER_SS12 (size: 12)
 
-# Values adjusted -> depend on surface/soil (23)
-# - ICE
+# Values adjusted -> depend on surface/soil (21)
 # - PLCOV_MN, PLCOV_MX, LAI_MN, LAI_MX
 # - EMIS_RAD
 # - RSMIN
@@ -113,9 +136,12 @@ print("-" * 79)
 # - ROOTDP
 # - NDVI_MAX
 # - SOILTYP
-# - LU_CLASS_FRACTION (size: 23)
 # - ALB_DIF12, ALNID12, ALUVD12, NDVI, NDVI_MRAT (size: 12)
 # - FR_LAND, FR_LAKE, DEPTH_LK
+
+# Dropped values -> not used by INT2LM (and inconsistent with modification) (2)
+# - ICE
+# - LU_CLASS_FRACTION (size: 23)
 
 # Miscellaneous
 # - LU_CLASS_FRACTION -> add up to 1.0
@@ -160,11 +186,10 @@ if adj_ice2soil:
         #     print(j // lon.shape[1], j % lon.shape[1], dist[ind])
 
         # Mask with ice/glacier (1) and water (9) grid cells
-        mask_soil = (soiltyp.ravel()[ind_lin] == 1.0) \
-            | (ice.ravel()[ind_lin] > 0.0) \
+        mask_ice_water = (soiltyp.ravel()[ind_lin] == 1.0) \
             | (soiltyp.ravel()[ind_lin] == 9.0)
         frac_diff_abs = np.abs(fr_land.ravel()[ind_lin] - fr_land[ind_2d_ta])
-        frac_diff_abs[mask_soil] = np.nan
+        frac_diff_abs[mask_ice_water] = np.nan
         mask_frac = (frac_diff_abs == np.nanmin(frac_diff_abs))
         dist[~mask_frac] = np.nan
         ind_sel = np.nanargmin(dist)
@@ -199,23 +224,33 @@ if adj_ice2soil:
 # -----------------------------------------------------------------------------
 
 # Variables that are replaced
-var_rep = {"2d": ("ICE", "PLCOV_MN", "PLCOV_MX", "LAI_MN", "LAI_MX",
+var_rep = {"2d": ("PLCOV_MN", "PLCOV_MX", "LAI_MN", "LAI_MX",
                   "EMIS_RAD", "RSMIN", "URBAN", "FOR_D", "FOR_E",
                   "SKC", "ROOTDP", "NDVI_MAX", "SOILTYP",
                   "FR_LAND", "FR_LAKE", "DEPTH_LK"),
-           "3d": ("LU_CLASS_FRACTION",
-                  "ALB_DIF12", "ALNID12", "ALUVD12", "NDVI", "NDVI_MRAT")}
+           "3d": ("ALB_DIF12", "ALNID12", "ALUVD12", "NDVI", "NDVI_MRAT")}
 
 # Load data from EXTPAR files
 ds = xr.open_dataset(file_mod)
+ds = ds.drop(["ICE", "LU_CLASS_FRACTION"])
+gc_lake_before = (ds["FR_LAKE"].values != 0).sum()
 for i in var_rep["2d"]:
     ds[i].values[ind_ta[0], ind_ta[1]] = ds[i].values[ind_su[0], ind_su[1]]
 for i in var_rep["3d"]:
     ds[i].values[:, ind_ta[0], ind_ta[1]] \
         = ds[i].values[:, ind_su[0], ind_su[1]]
+gc_lake_after = (ds["FR_LAKE"].values != 0).sum()
 ds.to_netcdf(file_mod[:-3] + "_adj.nc", format="NETCDF4",
              encoding={"time": {"_FillValue": None},
                        "mlev": {"_FillValue": None}})
-# significant difference in created EXTPAR file:
-# - new dimension "string1 = 1 ;"
-# - char rotated_pole ; -> char rotated_pole(string1) ;
+
+print("Number of grid cells with non-zero lake fraction: ")
+print("Before modification: " + str(gc_lake_before))
+print("After modification: " + str(gc_lake_after))
+print("-" * 79)
+
+# Notes:
+# - Difference in modified EXTPAR file:
+#   - new dimension "string1 = 1 ;"
+#   - char rotated_pole ; -> char rotated_pole(string1) ;
+#   -> if issue -> solvable by encoding; e.g. "rotated_pole": {"dtype": ""}

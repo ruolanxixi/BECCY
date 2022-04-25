@@ -18,7 +18,7 @@ lat_0, lon_0 = 33.23000, 95.10000  # reference location [degree]
 rad_red = 1800.0  # reduction radius [km]
 rad_red_ext = 300.0  # extend reduction radius at flat, amplitude maximum [km]
 alpha_0, alpha_1 = -135.0, 45.0  # measured anti-clockwise from East [degree]
-fac_amp = 0.75  # 0.5  # 0.8  # 0.75  # amplitude of terrain reduction
+fac_amp = 0.90  # 0.75  # amplitude of terrain reduction
 topo_min = 500.0  # minimal allowed elevation for terrain reduction
 
 # Map projection
@@ -31,10 +31,10 @@ tiles_dem = ("MERIT_N60-N30_E060-E090.nc", "MERIT_N60-N30_E090-E120.nc",
              "MERIT_N30-N00_E060-E090.nc", "MERIT_N30-N00_E090-E120.nc")
 
 # Paths
-path_dem = "/Users/kaktus/Documents/ETH/BECCY/myscripts/topo/"
-path_out = "/Users/kaktus/Documents/ETH/BECCY/myscripts/topo/"
-# path_dem = "/Users/csteger/Dropbox/IAC/Data/DEMs/MERIT/Tiles/"
-# path_out = "/Users/csteger/Desktop/Temp/"
+# path_dem = "/Users/kaktus/Documents/ETH/BECCY/myscripts/topo/"
+# path_out = "/Users/kaktus/Documents/ETH/BECCY/myscripts/topo/"
+path_dem = "/Users/csteger/Dropbox/IAC/Data/DEMs/MERIT/Tiles/"
+path_out = "/Users/csteger/Desktop/Temp/"
 
 # Miscellaneous
 fac_red_out = True  # output reduction factor
@@ -91,41 +91,41 @@ for i in tiles_dem:
     trans_ellps2cart = Transformer.from_crs(crs_wgs84, crs_aeqd,
                                             always_xy=True)
 
-    # Accurate transformation (slow)
-    beg_time = time.time()
-    x, y = trans_ellps2cart.transform(lon_2d, lat_2d)
-    x, y, = x.astype(np.float32), y.astype(np.float32)
-    print("Coordinate transformation: %.2f" % (time.time() - beg_time)
-          + " sec")
-    del lon_2d, lat_2d
-
-    # # Approximation of transformation with bilinear interpolation (fast)
-    # step = 10  # spacing of accurate transformation
+    # # Accurate transformation (slow)
     # beg_time = time.time()
-    # mask = np.zeros((ny, nx), dtype=bool)
-    # mask[0:ny:step, 0:nx:step] = True
-    # mask[0:ny:step, -1], mask[-1, 0:nx:step] = True, True
-    # mask[-1, -1] = True
-    # print("Fraction of transformed coordinates: %.2f"
-    #       % (mask.sum() / float(mask.size) * 100.0) + " %")
-    # x_trans, y_trans = trans_ellps2cart.transform(lon_2d[mask], lat_2d[mask])
-    # shp = mask[:, 0].sum(), mask[0, :].sum()
-    # x_trans, y_trans = x_trans.reshape(shp), y_trans.reshape(shp)
-    # ind_y = np.arange(0, lon_2d.shape[0], step)
-    # if ind_y[-1] != (lon_2d.shape[0] - 1):
-    #     ind_y = np.append(ind_y, lon_2d.shape[0] - 1)
-    # ind_x = np.arange(0, lon_2d.shape[1], step)
-    # if ind_x[-1] != (lon_2d.shape[1] - 1):
-    #     ind_x = np.append(ind_x, lon_2d.shape[1] - 1)
-    # f_ip = interpolate.RectBivariateSpline(ind_y, ind_x, x_trans, kx=1, ky=1)
-    # x = f_ip(np.arange(lon_2d.shape[0]), np.arange(lon_2d.shape[1])) \
-    #     .astype(np.float32)
-    # f_ip = interpolate.RectBivariateSpline(ind_y, ind_x, y_trans, kx=1, ky=1)
-    # y = f_ip(np.arange(lon_2d.shape[0]), np.arange(lon_2d.shape[1])) \
-    #     .astype(np.float32)
+    # x, y = trans_ellps2cart.transform(lon_2d, lat_2d)
+    # x, y, = x.astype(np.float32), y.astype(np.float32)
     # print("Coordinate transformation: %.2f" % (time.time() - beg_time)
     #       + " sec")
-    # del lon_2d, lat_2d, mask
+    # del lon_2d, lat_2d
+
+    # Approximation of transformation with bilinear interpolation (fast)
+    step = 10  # spacing of accurate transformation
+    beg_time = time.time()
+    mask = np.zeros((ny, nx), dtype=bool)
+    mask[0:ny:step, 0:nx:step] = True
+    mask[0:ny:step, -1], mask[-1, 0:nx:step] = True, True
+    mask[-1, -1] = True
+    print("Fraction of transformed coordinates: %.2f"
+          % (mask.sum() / float(mask.size) * 100.0) + " %")
+    x_trans, y_trans = trans_ellps2cart.transform(lon_2d[mask], lat_2d[mask])
+    shp = mask[:, 0].sum(), mask[0, :].sum()
+    x_trans, y_trans = x_trans.reshape(shp), y_trans.reshape(shp)
+    ind_y = np.arange(0, lon_2d.shape[0], step)
+    if ind_y[-1] != (lon_2d.shape[0] - 1):
+        ind_y = np.append(ind_y, lon_2d.shape[0] - 1)
+    ind_x = np.arange(0, lon_2d.shape[1], step)
+    if ind_x[-1] != (lon_2d.shape[1] - 1):
+        ind_x = np.append(ind_x, lon_2d.shape[1] - 1)
+    f_ip = interpolate.RectBivariateSpline(ind_y, ind_x, x_trans, kx=1, ky=1)
+    x = f_ip(np.arange(lon_2d.shape[0]), np.arange(lon_2d.shape[1])) \
+        .astype(np.float32)
+    f_ip = interpolate.RectBivariateSpline(ind_y, ind_x, y_trans, kx=1, ky=1)
+    y = f_ip(np.arange(lon_2d.shape[0]), np.arange(lon_2d.shape[1])) \
+        .astype(np.float32)
+    print("Coordinate transformation: %.2f" % (time.time() - beg_time)
+          + " sec")
+    del lon_2d, lat_2d, mask
 
     # -------------------------------------------------------------------------
 
@@ -157,21 +157,21 @@ for i in tiles_dem:
     fac_azim[mask] = 0.0
     del azim, mask
 
+    # Compute total reduction factor
+    fac_red = (fac_amp * fac_dist * fac_azim)
+    del fac_dist, fac_azim
+
     # Apply reduction factor to terrain
     mask_water = (topo == topo_fill_val)
-    mask_500m = (topo > topo_min)   # unaltered topography > 500 m
-    # topo = topo.astype(np.float32) * (1.0 - (fac_amp * fac_dist * fac_azim))
-    topo[mask_500m] = topo[mask_500m].astype(np.float32) - (topo[mask_500m].astype(np.float32) - topo_min) * (fac_amp * fac_dist * fac_azim)
-    # topo[mask_500m & (topo < topo_min)] = topo_min
-    if fac_red_out:
-        fac_red = (fac_amp * fac_dist * fac_azim)
-    del fac_dist, fac_azim, mask_500m
+    topo = topo.astype(np.float32)
+    topo -= ((topo - topo_min) * fac_red).clip(min=0.0)
 
     # Convert topography back to 16-bit integer
     topo = topo.astype(np.int16)
     if np.any(topo[mask_water] != topo_fill_val):
         print("water grid cell(s) modified -> reset")
         topo[mask_water] = topo_fill_val
+    del mask_water
 
     # Save modified topography in MERIT file
     slic = (slice(ind_lat_0, ind_lat_0 + topo.shape[0]),
@@ -185,3 +185,6 @@ for i in tiles_dem:
     ds.to_netcdf(path_out + i, format="NETCDF4",
                  encoding={"lat": {"_FillValue": None},
                            "lon": {"_FillValue": None}})
+    del fac_red
+    if fac_red_out:
+        del fac_red_tile

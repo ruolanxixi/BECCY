@@ -69,7 +69,7 @@ fac_red = spat_agg_2d(ds["fac_red"].values, agg_num, agg_num, "mean")
 ds.close()
 
 # Plot reduction factor
-levels = np.arange(0., 0.80, 0.05)
+levels = np.arange(0., 0.95, 0.05)
 cmap = cm.lajolla
 norm = mpl.colors.BoundaryNorm(levels, ncolors=cmap.N)
 fig = plt.figure()
@@ -88,7 +88,7 @@ plt.title("Topography reduction factor [-]", fontsize=12, fontweight="bold")
 fig.savefig(path_out + "reduction_factor.png", dpi=300, bbox_inches="tight")
 plt.close(fig)
 
-# Test plot
+# Plot topography (unmodified, reduced and difference)
 map_ext = [90.1, 109.9, 15.1, 39.9]
 fig = plt.figure(figsize=(11.0, 13.0))
 gs = gridspec.GridSpec(3, 3, left=0.1, bottom=0.1, right=0.9,

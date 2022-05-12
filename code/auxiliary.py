@@ -135,3 +135,50 @@ def spat_agg_2d(data, agg_num_0, agg_num_1, operation="sum"):
         data_agg /= float(agg_num_0 * agg_num_1)
 
     return data_agg
+
+
+###############################################################################
+
+def gridcoord(x_cent, y_cent):
+    """Compute edge coordinates.
+
+    Compute edge coordinates from grid cell centre coordinates
+
+    Parameters
+    ----------
+    x_cent: array_like
+        Array (1-dimensional) with x-coordinates of grid centres [arbitrary]
+    y_cent: array_like
+        Array (1-dimensional) with y-coordinates of grid centres [arbitrary]
+
+    Returns
+    -------
+    x_edge: array_like
+        Array (1-dimensional) with x-coordinates of grid edges [arbitrary]
+    y_edge: array_like
+        Array (1-dimensional) with y-coordinates of grid edges [arbitrary]
+
+    Notes
+    -----
+    Author: Christian Steger (christian.steger@env.ethz.ch)"""
+
+    # Check input arguments
+    if len(x_cent.shape) != 1 or len(y_cent.shape) != 1:
+        raise TypeError("number of dimensions of input arrays is not 1")
+    if (np.any(np.diff(np.sign(np.diff(x_cent))) != 0) or
+            np.any(np.diff(np.sign(np.diff(y_cent))) != 0)):
+        sys.exit("input arrays are not monotonically in- or decreasing")
+
+    # Compute grid spacing if not provided
+    dx = np.diff(x_cent).mean()
+    dy = np.diff(y_cent).mean()
+
+    # Compute grid coordinates
+    x_edge = np.hstack((x_cent[0] - (dx / 2.),
+                        x_cent[:-1] + np.diff(x_cent) / 2.,
+                        x_cent[-1] + (dx / 2.))).astype(x_cent.dtype)
+    y_edge = np.hstack((y_cent[0] - (dy / 2.),
+                        y_cent[:-1] + np.diff(y_cent) / 2.,
+                        y_cent[-1] + (dy / 2.))).astype(y_cent.dtype)
+
+    return x_edge, y_edge

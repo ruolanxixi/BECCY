@@ -1,4 +1,4 @@
-# Description: Plot modified topography
+# Description: Compute reduced topography part II (plot modified topography)
 #
 # Authors: Ruolan Xiang, Christian R. Steger, IAC ETH Zurich
 

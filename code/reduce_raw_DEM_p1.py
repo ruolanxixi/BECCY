@@ -1,4 +1,5 @@
-# Description: Generate reduced elevation topography
+# Description: Compute reduced topography part I (generate reduced elevation
+#              topography)
 #
 # Authors: Ruolan Xiang, Christian R. Steger, IAC ETH Zurich
 

@@ -28,25 +28,29 @@ mpl.rcParams["mathtext.fontset"] = "custom"
 mpl.rcParams["mathtext.default"] = "rm"
 mpl.rcParams["mathtext.rm"] = "Bitstream Vera Sans"
 
-# Paths to folders
-path_dem = "/Users/csteger/Dropbox/IAC/Data/DEMs/MERIT/Tiles/"
-path_plot = "/Users/csteger/Dropbox/IAC/Plots/BECCY/Topo_envelop/"
-path_out = "/Users/csteger/Dropbox/IAC/Data/Model/BECCY/"
-
 # Load required functions
 sys.path.append("/Users/csteger/Dropbox/IAC/Scripts/Functions/")
 from plot_utilities import truncate_colormap
 from miscellaneous import spat_agg_2d, spat_agg_1d
 
 ###############################################################################
-# Process data
+# Settings
 ###############################################################################
+
+# Paths
+path_dem = "/Users/csteger/Dropbox/IAC/Data/DEMs/MERIT/Tiles/"
+path_plot = "/Users/csteger/Dropbox/IAC/Plots/BECCY/Topo_envelop/"
+path_out = "/Users/csteger/Dropbox/IAC/Data/Model/BECCY/"
 
 # Constants
 rad_earth = 6370997.0  # default PROJ sphere radius [m]
 
 # Settings
 fac_curv = [1.0, 4.0, 8.0, 12.0]  # "surface curvature factor"
+
+###############################################################################
+# Process data
+###############################################################################
 
 # Load MERIT DEM
 files_dem = ("MERIT_N60-N30_E060-E090.nc", "MERIT_N30-N00_E060-E090.nc",

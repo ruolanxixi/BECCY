@@ -42,9 +42,9 @@ tiles_dem = ("MERIT_N60-N30_E060-E090.nc", "MERIT_N60-N30_E090-E120.nc",
              "MERIT_N30-N00_E060-E090.nc", "MERIT_N30-N00_E090-E120.nc")
 
 # Paths
-path_dem_raw = "/Users/csteger/Dropbox/IAC/Data/DEMs/MERIT/Tiles/"
-path_dem_mod = "/Users/csteger/Desktop/Temp/"
-path_out = "/Users/csteger/Desktop/Temp/"
+path_dem = "/Users/csteger/Dropbox/IAC/Data/DEMs/MERIT/Tiles/"
+path_in_out = "/Users/csteger/Dropbox/IAC/Data/Model/BECCY/MERIT_tiles_red/"
+path_plot = "/Users/csteger/Dropbox/IAC/Plots/BECCY/Topo_reduce/"
 
 ###############################################################################
 # Process MERIT data
@@ -54,7 +54,7 @@ path_out = "/Users/csteger/Desktop/Temp/"
 agg_num = 10
 
 # Load unmodified topography and aggregate
-ds = xr.open_mfdataset([path_dem_raw + i for i in tiles_dem])
+ds = xr.open_mfdataset([path_dem + i for i in tiles_dem])
 ds = ds.sel(lon=slice(90.0, 110.0 - 0.0001), lat=slice(41.0 - 0.0001, 15.0))
 topo = spat_agg_2d(ds["Elevation"].values, agg_num, agg_num, "mean")
 lon = spat_agg_1d(ds["lon"].values, agg_num, "mean")
@@ -62,7 +62,7 @@ lat = spat_agg_1d(ds["lat"].values, agg_num, "mean")
 ds.close()
 
 # Load modified topography
-ds = xr.open_mfdataset([path_dem_mod + i for i in tiles_dem])
+ds = xr.open_mfdataset([path_in_out + i for i in tiles_dem])
 ds = ds.sel(lon=slice(90.0, 110.0 - 0.0001), lat=slice(41.0 - 0.0001, 15.0))
 topo_red = spat_agg_2d(ds["Elevation"].values, agg_num, agg_num, "mean")
 fac_red = spat_agg_2d(ds["fac_red"].values, agg_num, agg_num, "mean")
@@ -85,7 +85,7 @@ gl.top_labels = False
 gl.right_labels = False
 plt.colorbar()
 plt.title("Topography reduction factor [-]", fontsize=12, fontweight="bold")
-fig.savefig(path_out + "reduction_factor.png", dpi=300, bbox_inches="tight")
+fig.savefig(path_plot + "reduction_factor.png", dpi=300, bbox_inches="tight")
 plt.close(fig)
 
 # Plot topography (unmodified, reduced and difference)
@@ -138,5 +138,5 @@ ax = plt.subplot(gs[2, 0])
 cb = mpl.colorbar.ColorbarBase(ax, cmap=cmap, norm=norm, ticks=ticks,
                                orientation="horizontal")
 # -----------------------------------------------------------------------------
-fig.savefig(path_out + "reduced_topography.png", dpi=300, bbox_inches="tight")
+fig.savefig(path_plot + "reduced_topography.png", dpi=300, bbox_inches="tight")
 plt.close(fig)

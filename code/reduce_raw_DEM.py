@@ -34,7 +34,7 @@ tiles_dem = ("MERIT_N60-N30_E060-E090.nc", "MERIT_N60-N30_E090-E120.nc",
 # path_dem = "/Users/kaktus/Documents/ETH/BECCY/myscripts/topo/"
 # path_out = "/Users/kaktus/Documents/ETH/BECCY/myscripts/topo/"
 path_dem = "/Users/csteger/Dropbox/IAC/Data/DEMs/MERIT/Tiles/"
-path_out = "/Users/csteger/Desktop/Temp/"
+path_out = "/Users/csteger/Dropbox/IAC/Data/Model/BECCY/MERIT_tiles_red/"
 
 # Miscellaneous
 fac_red_out = True  # output reduction factor

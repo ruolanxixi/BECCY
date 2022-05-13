@@ -7,7 +7,7 @@
 #   - Central Asia:	   https://doi.org/10.1594/PANGAEA.891415
 #   - South Asia East: https://doi.org/10.1594/PANGAEA.891417
 #
-# Authors: Christian R. Steger, IAC ETH Zurich
+# Author: Christian R. Steger, IAC ETH Zurich
 
 # Load modules
 import os
@@ -28,17 +28,18 @@ from pyproj import CRS, Transformer
 
 mpl.style.use("classic")
 
-# Paths to folders
-root_IAC = os.getenv("HOME") + "/Dropbox/IAC/"
-path_globcov = root_IAC + "Data/Observations/Globcover2009/Globcover2009_V2/"
-path_GAMDAM = root_IAC + "Data/Shapefiles/GAMDAM/Area_altitude_distribution/"
-path_dem = "/Users/csteger/Dropbox/IAC/Data/DEMs/MERIT/Tiles/"
-path_temp = root_IAC + "Temp/BECCY_glaciation/"
-path_out = "/Users/csteger/Desktop/"
-
 ###############################################################################
 # Settings
 ###############################################################################
+
+# Paths
+path_globcov = "/Users/csteger/Dropbox/IAC/Data/Observations/Globcover2009/" \
+               + "Globcover2009_V2/"
+path_GAMDAM = "/Users/csteger/Dropbox/IAC/Data/Shapefiles/GAMDAM/"\
+              + "Area_altitude_distribution/"
+path_dem = "/Users/csteger/Dropbox/IAC/Data/DEMs/MERIT/Tiles/"
+path_temp = "/Users/csteger/Dropbox/IAC/Temp/BECCY_glaciation/"
+path_plot = "/Users/csteger/Dropbox/IAC/Plots/BECCY/"
 
 # Reference location
 lat_0, lon_0 = 33.23000, 95.10000  # reference location [degree]
@@ -256,7 +257,7 @@ cb = mpl.colorbar.ColorbarBase(ax, cmap=cmap_topo, norm=norm_topo,
 cb.ax.tick_params(labelsize=10)
 plt.xlabel("Terrain elevation [m]", fontsize=10)
 # -----------------------------------------------------------------------------
-fig.savefig(path_out + "Snow_ice_threshold_elevation_map.png",
+fig.savefig(path_plot + "Snow_ice_threshold_elevation_map.png",
             bbox_inches="tight", dpi=300)
 plt.close(fig)
 
@@ -283,7 +284,7 @@ plt.title("Distribution of permanent snow/ice line and glacier median "
           + "elevation", fontsize=13, fontweight="bold", y=1.01)
 plt.legend([l0[-1], l1[-1]], ["GlobCover 2009", "GAMDAM"], loc="upper right",
            fontsize=12, frameon=False)
-fig.savefig(path_out + "Snow_ice_threshold_elevation_histogram.pdf",
+fig.savefig(path_plot + "Snow_ice_threshold_elevation_histogram.pdf",
             bbox_inches="tight")
 plt.close(fig)
 

@@ -32,11 +32,11 @@ from netCDF4 import Dataset
 mpl.style.use("classic")
 
 # Load required functions
-sys.path.append("/Users/csteger/Dropbox/IAC/Scripts/Functions/")
-from plot_utilities import truncate_colormap
-from grid_utilities import gridcoord
-from miscellaneous import spat_agg_2d, spat_agg_1d
-sys.path.append("/Users/csteger/Dropbox/IAC/Scripts/BECCY/Isostasy/")
+sys.path.append("/Users/csteger/Downloads/BECCY/code/")
+from auxiliary import truncate_colormap
+from auxiliary import gridcoord
+from auxiliary import spat_agg_2d, spat_agg_1d
+sys.path.append("/Users/csteger/Downloads/BECCY/code/Isostasy/")
 from isostasy_cy import deflection_lonlat
 
 ###############################################################################
@@ -249,7 +249,7 @@ if (np.any(weights[0, :] != 1.0) or np.any(weights[-1, :] != 1.0)
 # plt.pcolormesh(lon_agg, lat_agg, weights_agg, shading="auto")
 # plt.colorbar()
 
-# Merge topography
+# Merge topographies
 mask_mod = np.zeros(topo_raw.shape, dtype=bool)  # modified grid cells
 topo_raw[slic_env] = topo_raw[slic_env] * weights + topo_env * (1.0 - weights)
 mask_mod[slic_env] = (weights < 1.0)

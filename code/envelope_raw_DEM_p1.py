@@ -29,9 +29,9 @@ mpl.rcParams["mathtext.default"] = "rm"
 mpl.rcParams["mathtext.rm"] = "Bitstream Vera Sans"
 
 # Load required functions
-sys.path.append("/Users/csteger/Dropbox/IAC/Scripts/Functions/")
-from plot_utilities import truncate_colormap
-from miscellaneous import spat_agg_2d, spat_agg_1d
+sys.path.append("/Users/csteger/Downloads/BECCY/code/")
+from auxiliary import truncate_colormap
+from auxiliary import spat_agg_2d, spat_agg_1d
 
 ###############################################################################
 # Settings

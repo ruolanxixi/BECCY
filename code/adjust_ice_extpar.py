@@ -28,10 +28,13 @@ adj_ice2soil = True
 adj_soil2ice = False
 
 # EXTPAR files
-# file_ref = "/Users/csteger/Desktop/extpar_BECCY_4.4km_merit_unmod_topo.nc"
-# file_mod = "/Users/csteger/Desktop/extpar_BECCY_4.4km_merit_reduced_topo.nc"
-file_ref = "/Users/csteger/Desktop/extpar_EAS_ext_12km_merit_unmod_topo.nc"
-file_mod = "/Users/csteger/Desktop/extpar_EAS_ext_12km_merit_reduced_topo.nc"
+path = "/Users/csteger/Dropbox/IAC/Data/Model/BECCY/EXTPAR_files/"
+file_ref = path + "extpar_EAS_ext_12km_merit_unmod_topo.nc"
+file_mod = path + "extpar_EAS_ext_12km_merit_reduced_topo.nc"
+# file_ref = path + "extpar_BECCY_4.4km_merit_unmod_topo.nc"
+# file_mod = path + "extpar_BECCY_4.4km_merit_reduced_topo.nc"
+# file_ref = path + "extpar_BECCY_2.2km_merit_unmod_topo.nc"
+# file_mod = path + "extpar_BECCY_2.2km_merit_env_topo.nc"
 
 # Search radius for (nearest) neighbour grid cells
 rad_search = 50.0 * 1000.0  # [m]
@@ -89,12 +92,23 @@ if np.any(np.diff(arr_bool, axis=0)):
                      + "inconsistent")
 
 # Find adjustable grid cells
-print("-" * 79)
 mask_mod = (np.abs(topo_unmod - topo_mod) > 0.001)
 mask_ice2soil = (mask_mod & (soiltyp == 1.0) & (topo_mod < elev_thresh[0]))
-print("Number of grid cells (ice2soil): " + str(mask_ice2soil.sum()))
 mask_soil2ice = (mask_mod & (soiltyp != 1.0) & (topo_mod > elev_thresh[2]))
-print("Number of grid cells (soil2ice): " + str(mask_soil2ice.sum()))
+
+# Print statistics of potential correction (ice -> soil and soil -> ice)
+masks = {"ice -> soil": mask_ice2soil, "soil -> ice": mask_soil2ice}
+for i in list(masks.keys()):
+    print((" " + i + ": potential correction ").center(79, "-"))
+    txt = str(masks[i].sum()) + ", " \
+        + "%.3f" % (masks[i].sum() / mask_mod.sum() * 100.0) + " %, " \
+        + "%.3f" % (masks[i].sum() / mask_mod.size * 100.0) + " %"
+    print("Grid cell (total, percentage of modified and all): " + txt)
+    txt = "[%.0f" % topo_unmod[masks[i]].min() + " m, " \
+          + "%.0f" % topo_unmod[masks[i]].max() + " m]" + " -> " \
+          + "[%.0f" % topo_mod[masks[i]].min() + " m, " \
+          + "%.0f" % topo_mod[masks[i]].max() + " m]"
+    print("Elevation range (unmod -> mod): " + txt)
 
 # Statistics for grid cells that have to be adjusted
 print(" Statistics of adjusted grid cells with water fraction "
@@ -217,7 +231,9 @@ if adj_ice2soil:
 # Derive grid cell replacement indices for soil -> ice
 # -----------------------------------------------------------------------------
 
-# To do..
+if adj_soil2ice:
+
+    raise ValueError("Adjusting grid cells from soil -> ice not implemented")
 
 # -----------------------------------------------------------------------------
 # Adjust EXTPAR file

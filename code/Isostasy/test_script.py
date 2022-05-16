@@ -16,9 +16,9 @@ import time
 mpl.style.use("classic")
 
 # Load required functions
-sys.path.append("/Users/csteger/Dropbox/IAC/Scripts/Functions/")
-from grid_utilities import gridcoord
-sys.path.append("/Users/csteger/Dropbox/IAC/Scripts/BECCY/Isostasy/")
+sys.path.append("/Users/csteger/Downloads/BECCY/code/")
+from auxiliary import gridcoord
+sys.path.append("/Users/csteger/Downloads/BECCY/code/Isostasy/")
 from isostasy_cy import deflection_xy, deflection_lonlat
 
 ###############################################################################

@@ -40,27 +40,27 @@ from auxiliary import spat_agg_2d, spat_agg_1d
 # Paths
 path_dem = "/Users/csteger/Dropbox/IAC/Data/DEMs/MERIT/Tiles/"
 path_plot = "/Users/csteger/Dropbox/IAC/Plots/BECCY/Topo_envelop/"
-path_out = "/Users/csteger/Dropbox/IAC/Data/Model/BECCY/"
+path_out = "/Users/csteger/Dropbox/IAC/Data/Model/BECCY/env_topo_raw/"
 
 # Constants
 rad_earth = 6370997.0  # default PROJ sphere radius [m]
 
 # Settings
-fac_curv = [1.0, 4.0, 8.0, 12.0]  # "surface curvature factor"
+fac_curv = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0]
+file_netcdf = "MERIT_envelope_topo.nc"
 
 ###############################################################################
-# Process data
+# Compute and save envelope topographies for different surface curvatures
 ###############################################################################
 
 # Load MERIT DEM
 files_dem = ("MERIT_N60-N30_E060-E090.nc", "MERIT_N30-N00_E060-E090.nc",
              "MERIT_N60-N30_E090-E120.nc", "MERIT_N30-N00_E090-E120.nc")
 ds = xr.open_mfdataset([path_dem + i for i in files_dem])
-# ds = ds.sel(lon=slice(96.0, 97.5), lat=slice(28.5, 27.5))  # small
-# ds = ds.sel(lon=slice(96, 100), lat=slice(30, 27))  # medium
-# ds = ds.sel(lon=slice(94, 106), lat=slice(34, 20))  # large (+ 1 deg) --- old
-ds = ds.sel(lon=slice(94.5, 107.3), lat=slice(34.0, 20.2))  # triang.: 4458
-# ds = ds.sel(lon=slice(94.5, 107.4), lat=slice(34.0, 20.1))  # triang.: 32484
+# ds = ds.sel(lon=slice(96.0, 97.5), lat=slice(28.5, 27.5))  # (test; small)
+# ds = ds.sel(lon=slice(96, 100), lat=slice(30, 27))  # (test; medium)
+# ds = ds.sel(lon=slice(94.5, 107.3), lat=slice(34.0, 20.2))  # (old)
+ds = ds.sel(lon=slice(94.4, 107.4), lat=slice(34.1, 20.1))  # (new; +0.1 deg)
 topo = ds["Elevation"].values  # 32-bit float
 lon = ds["lon"].values
 lat = ds["lat"].values
@@ -78,11 +78,33 @@ print("Number of ocean grid cells: " + str(mask_ocean.sum()))
 topo[mask_ocean] = 0.0  # set ocean grid cells to 0.0 m
 print("Minimal DEM elevation: " + str(topo.min()) + " m")
 
+# -----------------------------------------------------------------------------
+# Generate and save envelope topography
+# -----------------------------------------------------------------------------
+
+# Create NetCDF file
+topo_fill_val = -32767
+ncfile = Dataset(filename=path_out + file_netcdf, mode="w")
+ncfile.createDimension(dimname="lat", size=topo.shape[0])
+nc_lat = ncfile.createVariable(varname="lat", datatype="f", dimensions="lat")
+nc_lat.units = "degrees_north"
+nc_lat[:] = lat
+ncfile.createDimension(dimname="lon", size=topo.shape[1])
+nc_lat = ncfile.createVariable(varname="lon", datatype="f", dimensions="lon")
+nc_lat.units = "degrees_east"
+nc_lat[:] = lon
+nc_data = ncfile.createVariable(varname="Elevation", datatype="i2",
+                                dimensions=("lat", "lon"),
+                                fill_value=topo_fill_val)
+nc_data.units = "m"
+nc_data.long_name = "Unmodified topography"
+nc_data[:] = np.where(mask_ocean, topo_fill_val, topo).astype(np.int16)
+ncfile.close()
+
 # Loop through different curvature factors
-topo_env_all = {}
 for i in fac_curv:
 
-    print((" Curvature factor %.1f" % i + " ").center(79, "#"))
+    print((" Surface curvature factor %.1f" % i + " ").center(79, "#"))
 
     # Construct coordinates centred at prime meridian / equator
     dx = (2.0 * np.pi * rad_earth * np.cos(np.deg2rad(lat.mean()))) \
@@ -183,13 +205,37 @@ for i in fac_curv:
           + " sec")
     print("Maximal elevation of ocean grid cell: %.1f"
           % np.nanmax(topo_env[mask_ocean]) + " m")
-    topo_env_all[i] = {"topo": topo_env, "simplices": simplices_rel,
-                       "indices_nodes": ind_nodes}
+
+    # Append to NetCDF file
+    ncfile = Dataset(filename=path_out + file_netcdf, mode="a")
+    nc_data = ncfile.createVariable(varname="Elev_curv_%.1f" % i,
+                                    datatype="i2", dimensions=("lat", "lon"),
+                                    fill_value=topo_fill_val)
+    nc_data.units = "m"
+    nc_data.long_name = "Envelope topography (surface curvature " \
+                        + "factor: %.1f" % i + ")"
+    nc_data[:] = np.where(np.isnan(topo_env), topo_fill_val, topo_env) \
+        .astype(np.int16)
+    ncfile.close()
+
+    np.savez(path_out + "aux_curv_%.1f" % i + ".npz", simplices=simplices_rel,
+             indices_nodes=ind_nodes)
+
     del ind_nodes, simplices_rel
 
 ###############################################################################
-# Plot envelope topographies
+# Plot selected envelope topographies
 ###############################################################################
+
+# Select experiments
+fac_curv_sel = [1.0, 4.0, 5.0, 6.0, 8.0]
+
+# Load topographies
+topo_env = {}
+ds = xr.open_dataset(path_out + file_netcdf)
+for i in fac_curv_sel:
+    topo_env[i] = ds["Elev_curv_%.1f" % i].values  # 32-bit float
+ds.close()
 
 # Spatially aggregate data for plotting
 agg_num = 10
@@ -200,10 +246,10 @@ mask_ocean_agg = spat_agg_2d(mask_ocean[slic], agg_num, agg_num,
                              operation="sum")
 lon_agg = spat_agg_1d(lon[slic[1]], agg_num, operation="mean")
 lat_agg = spat_agg_1d(lat[slic[0]], agg_num, operation="mean")
-topo_env_all_agg = {}
-for i in fac_curv:
-    topo_env_all_agg[i] = spat_agg_2d(topo_env_all[i]["topo"][slic],
-                                      agg_num, agg_num, operation="mean")
+topo_env_agg = {}
+for i in fac_curv_sel:
+    topo_env_agg[i] = spat_agg_2d(topo_env[i][slic], agg_num, agg_num,
+                                  operation="mean")
 
 # Colormap
 levels_topo = np.arange(0., 5750.0, 250.0)
@@ -224,13 +270,14 @@ norm_diff = mpl.colors.BoundaryNorm(levels_diff, ncolors=cmap_diff.N,
 lon_2d, lat_2d = np.meshgrid(lon, lat)
 
 # Plot
-fig = plt.figure(figsize=(11.3, 16.5))
-gs = gridspec.GridSpec(len(fac_curv) + 1, 3, left=0.1, bottom=0.1, right=0.9,
-                       top=0.9, hspace=0.05, wspace=0.05,
-                       height_ratios=[1.0] * len(fac_curv) + [0.06])
+# fig = plt.figure(figsize=(11.3, 16.5))  # 4 rows
+fig = plt.figure(figsize=(11.3, 19.5))  # 5 rows
+gs = gridspec.GridSpec(len(fac_curv_sel) + 1, 3, left=0.1, bottom=0.1,
+                       right=0.9, top=0.9, hspace=0.05, wspace=0.05,
+                       height_ratios=[1.0] * len(fac_curv_sel) + [0.06])
 # -----------------------------------------------------------------------------
 count = 0
-for i in fac_curv:
+for i in fac_curv_sel:
     ax = plt.subplot(gs[count, 0], projection=ccrs.PlateCarree())
     if topo.size <= (2000 * 2000):
         plt.pcolormesh(lon, lat, topo, cmap=cmap_topo, norm=norm_topo,
@@ -238,14 +285,22 @@ for i in fac_curv:
     else:
         plt.pcolormesh(lon_agg, lat_agg, topo_agg, cmap=cmap_topo,
                        norm=norm_topo, shading="auto")
-    if topo_env_all[i]["simplices"].shape[0] <= 5000:
-        for j in range(topo_env_all[i]["simplices"].shape[0]):
-            ind = topo_env_all[i]["simplices"][j, :]
+    data_aux = np.load(path_out + "aux_curv_%.1f" % i + ".npz")
+    if i == 1.0:  # set manually
+        for j in range(data_aux["simplices"].shape[0]):
+            ind = data_aux["simplices"][j, :]
             ind_cl = np.append(ind, ind[0])
-            plt.plot(lon_2d.ravel()[ind_cl], lat_2d.ravel()[ind_cl],
-                     "black", lw=1.0)
-    ind_nodes = topo_env_all[i]["indices_nodes"]
-    if len(ind_nodes) <= 600000:
+            rang_0 = np.ptp(ind // lon_2d.shape[1])
+            rang_1 = np.ptp(ind % lon_2d.shape[1])
+            if (rang_0 > 1) or (rang_1 > 1):
+                plt.plot(lon_2d.ravel()[ind_cl], lat_2d.ravel()[ind_cl],
+                         "black", lw=1.0)
+                # -> do not plot triangles that are formed by directly
+                #    neighbouring grid cells (occur over ocean) -> too
+                #    expensive to plot
+    ind_nodes = data_aux["indices_nodes"]
+    data_aux.close()
+    if i in (1.0, 4.0):  # set manually
         plt.scatter(lon_2d.ravel()[ind_nodes], lat_2d.ravel()[ind_nodes], s=1,
                     color="black")
     ax.set_aspect("auto")
@@ -266,16 +321,16 @@ cmap_red = mpl.colors.ListedColormap(["red"])
 bounds_red = [0.5, 1.5]
 norm_red = mpl.colors.BoundaryNorm(bounds_red, cmap_red.N)
 count = 0
-for i in fac_curv:
+for i in fac_curv_sel:
     ax = plt.subplot(gs[count, 1], projection=ccrs.PlateCarree())
     if topo.size <= (2000 * 2000):
-        plt.pcolormesh(lon, lat, topo_env_all[i]["topo"], cmap=cmap_topo,
-                       norm=norm_topo, shading="auto")
+        plt.pcolormesh(lon, lat, topo_env[i], cmap=cmap_topo, norm=norm_topo,
+                       shading="auto")
         data_plot = np.ma.masked_where(mask_ocean == 0, np.ones_like(topo))
         plt.pcolormesh(lon, lat, data_plot, cmap=cmap_red, norm=norm_red,
                        shading="auto")
     else:
-        plt.pcolormesh(lon_agg, lat_agg, topo_env_all_agg[i], cmap=cmap_topo,
+        plt.pcolormesh(lon_agg, lat_agg, topo_env_agg[i], cmap=cmap_topo,
                        norm=norm_topo, shading="auto")
         data_plot = np.ma.masked_where(mask_ocean_agg == 0,
                                        np.ones_like(topo_agg))
@@ -289,13 +344,13 @@ for i in fac_curv:
     count += 1
 # -----------------------------------------------------------------------------
 count = 0
-for i in fac_curv:
+for i in fac_curv_sel:
     ax = plt.subplot(gs[count, 2], projection=ccrs.PlateCarree())
     if topo.size <= (2000 * 2000):
-        plt.pcolormesh(lon, lat, (topo_env_all[i]["topo"] - topo),
-                       cmap=cmap_diff, norm=norm_diff, shading="auto")
+        plt.pcolormesh(lon, lat, (topo_env[i] - topo), cmap=cmap_diff,
+                       norm=norm_diff, shading="auto")
     else:
-        plt.pcolormesh(lon_agg, lat_agg, (topo_env_all_agg[i] - topo_agg),
+        plt.pcolormesh(lon_agg, lat_agg, (topo_env_agg[i] - topo_agg),
                        cmap=cmap_diff, norm=norm_diff, shading="auto")
     ax.set_aspect("auto")
     plt.axis([lon.min(), lon.max(), lat.min(), lat.max()])
@@ -324,38 +379,40 @@ ind_lat = [np.argmin(np.abs(lat - i)) for i in lat_trans]
 
 # Plot
 fig = plt.figure(figsize=(16.0, 14.0))
-gs = gridspec.GridSpec(len(fac_curv) + 2, 3, left=0.1, bottom=0.1, right=0.9,
+gs = gridspec.GridSpec(len(ind_lat) + 2, 3, left=0.1, bottom=0.1, right=0.9,
                        top=0.9, hspace=0.05, wspace=0.05,
                        height_ratios=[1.0] * len(ind_lat) + [0.2, 1.4],
                        width_ratios=[1.0, 0.5, 1.0])
 # -----------------------------------------------------------------------------
 count_trans = 0
-cols = ["dodgerblue", "forestgreen", "orangered", "darkviolet"]
+# cols = ["peru", "dodgerblue", "forestgreen", "orangered", "darkviolet"]
+cols = cm.roma([0.0, 0.2, 0.4, 0.6, 0.8])
 for i in ind_lat:
     ax = plt.subplot(gs[count_trans, :])
     plt.fill_between(lon, 0.0, topo[i, :], color="lightgray")
     plt.plot(lon, topo[i, :], color="black", lw=1.0)
     count_exp = 0
-    for j in fac_curv:
-        plt.plot(lon, topo_env_all[j]["topo"][i, :],
-                 color=cols[count_exp], lw=1.5, label="%.1f" % j)
+    for j in fac_curv_sel:
+        plt.plot(lon, topo_env[j][i, :], color=cols[count_exp, :], lw=1.5,
+                 label="%.1f" % j)
         count_exp += 1
     if count_trans != len(ind_lat) - 1:
-        plt.xticks([])
+        plt.xticks(np.arange(90.0, 111.0, 1.0), "")
     else:
+        plt.xticks(np.arange(90.0, 111.0, 1.0))
         plt.xlabel("Longitude [$^{\circ}$]")
     if count_trans == 0:
         plt.legend(loc="upper right", frameon=False, fontsize=11,
-                   title="Surface curvature\n factor:", title_fontsize=11)
-    t = plt.text(0.08, 0.87, "Latitude: %.2f" % lat[i] + " $^{\circ}$N",
+                   title="Surface curvature\n factor:", title_fontsize=11,
+                   ncol=2)
+    t = plt.text(0.07, 0.90, "Latitude: %.2f" % lat[i] + " $^{\circ}$N",
                  fontsize=11,
                  horizontalalignment="center", verticalalignment="center",
                  transform=ax.transAxes, fontweight="bold")
-    t.set_bbox(dict(facecolor="white", alpha=1.0, edgecolor="white"))
+    t.set_bbox(dict(facecolor="white", alpha=0.7, edgecolor="white"))
     plt.yticks(range(1000, 9000, 1000))
     plt.ylabel("Elevation [m]")
     plt.axis([lon.min(), lon.max(), 0.0, 7500.0])
-    ax.ticklabel_format(useOffset=False)
     count_trans += 1
 # -----------------------------------------------------------------------------
 ax = plt.subplot(gs[-1, 1], projection=ccrs.PlateCarree())
@@ -380,49 +437,29 @@ fig.savefig(path_plot + "Envelope_convex_hull_cross.png", dpi=300,
 plt.close(fig)
 
 ###############################################################################
-# Save specific envelope experiment
+# Check mean elevation increase of envelope topographies for subdomain
 ###############################################################################
 
-key = 8.0
-topo_env = topo_env_all[key]["topo"].copy()
-del topo_env_all, topo_env_all_agg
+# Load topographies
+topo_env_mean = []
+ds = xr.open_dataset(path_out + file_netcdf)
+ds = ds.sel(lon=slice(96.0, 106.0), lat=slice(31.0, 22.0))
+if np.any(np.isnan(ds["Elevation"].values)):
+    raise ValueError("nan-value in data")
+topo_mean = ds["Elevation"].values.mean()
+for i in fac_curv:
+    if np.any(np.isnan(ds["Elev_curv_%.1f" % i].values)):
+        raise ValueError("nan-value in data")
+    topo_env_mean.append(ds["Elev_curv_%.1f" % i].values.mean())
+ds.close()
 
-# Convert topography back to 16-bit integer
-topo_fill_val = -32767
-topo = topo.astype(np.int16)
-topo_env = topo_env.astype(np.int16)
-elev_diff = (topo_env - topo)
-topo[mask_ocean] = topo_fill_val
-elev_diff[mask_ocean] = topo_fill_val
-del mask_ocean
-
-# Save to NetCDF file
-file = "MERIT_envelope_topo_fac_curv_%.1f" % key + ".nc"
-ncfile = Dataset(filename=path_out + file, mode="w")
-ncfile.createDimension(dimname="lat", size=topo.shape[0])
-nc_lat = ncfile.createVariable(varname="lat", datatype="f", dimensions="lat")
-nc_lat.units = "degrees_north"
-nc_lat[:] = lat
-ncfile.createDimension(dimname="lon", size=topo.shape[1])
-nc_lat = ncfile.createVariable(varname="lon", datatype="f", dimensions="lon")
-nc_lat.units = "degrees_east"
-nc_lat[:] = lon
-# -----------------------------------------------------------------------------
-nc_data = ncfile.createVariable(varname="Elevation", datatype="i2",
-                                dimensions=("lat", "lon"),
-                                fill_value=topo_fill_val)
-nc_data.units = "m"
-nc_data[:] = topo
-# -----------------------------------------------------------------------------
-nc_data = ncfile.createVariable(varname="Elevation_env", datatype="i2",
-                                dimensions=("lat", "lon"))
-nc_data.units = "m"
-nc_data[:] = topo_env
-# -----------------------------------------------------------------------------
-nc_data = ncfile.createVariable(varname="Elevation_diff", datatype="i2",
-                                dimensions=("lat", "lon"),
-                                fill_value=topo_fill_val)
-nc_data.units = "m"
-nc_data[:] = elev_diff
-# -----------------------------------------------------------------------------
-ncfile.close()
+# Plot
+fig = plt.figure(figsize=(6, 8))
+data_plot = ((topo_env_mean / topo_mean) - 1.0) * 100.0
+plt.plot(fac_curv, data_plot, color="dodgerblue", lw=1.5)
+plt.scatter(fac_curv, data_plot, s=30, color="dodgerblue")
+plt.xlabel("Surface curvature factor [-]")
+plt.ylabel("Increase in mean elevation of envelope topography [%]", labelpad=8)
+fig.savefig(path_plot + "Surf_curv_fac_vs_mean_elev.png", dpi=300,
+            bbox_inches="tight")
+plt.close(fig)

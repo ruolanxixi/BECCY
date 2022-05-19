@@ -55,7 +55,8 @@ dom_proc = {"lat": slice(36.5 - 0.0001, 18.0),
             "lon": slice(89.0, 110.0 - 0.0001)}  # MERIT domain to process
 agg_num_plot = 10  # spatial aggregation for plotting
 agg_num_iso = 50  # spatial aggregation for isostatic adjustment (~4.4 km)
-env_topo_sel = "Elev_curv_5.0"  # select envelope topography
+env_topo_sel = "Elev_curv_8.0"  # select envelope topography
+# (new: "Elev_curv_5.0")
 
 # Region with envelope topography
 env_cen = (26.50, 100.80)  # centre of circle (latitude/longitude) [deg]
@@ -103,8 +104,6 @@ ds = xr.open_dataset(path_in_out + "env_topo_raw/" + file)
 topo_env = ds[env_topo_sel].values.astype(np.float32)  # 32-bit float
 # -> does not contain ocean grid cells but can contain nan-values close to
 #    the edges
-if np.any(np.isnan(topo_env)):
-    raise ValueError("nan-values in envelope topography data")
 lon_env, lat_env = ds["lon"].values, ds["lat"].values
 ind_lon = np.where(lon_raw == lon_env[0])[0][0]
 ind_lat = np.where(lat_raw == lat_env[0])[0][0]
@@ -252,6 +251,16 @@ if (np.any(weights[0, :] != 1.0) or np.any(weights[-1, :] != 1.0)
 # plt.figure()
 # plt.pcolormesh(lon_agg, lat_agg, weights_agg, shading="auto")
 # plt.colorbar()
+
+# Deal with potential NaN-values in envelope topography
+if np.any(np.isnan(topo_env)):
+    print("NaN-values found in envelope topography (number: "
+          + str(np.isnan(topo_env).sum()) + ")")
+    if np.any(np.isnan(topo_env[(1.0 - weights) > 0.0])):
+        raise ValueError("NaN-values are located in utilized region")
+    else:
+        print("Set NaN-values of envelope topography to 0.0")
+        topo_env[np.isnan(topo_env)] = 0.0
 
 # Merge topographies
 mask_mod = np.zeros(topo_raw.shape, dtype=bool)  # modified grid cells

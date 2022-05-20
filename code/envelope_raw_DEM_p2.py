@@ -55,8 +55,8 @@ dom_proc = {"lat": slice(36.5 - 0.0001, 18.0),
             "lon": slice(89.0, 110.0 - 0.0001)}  # MERIT domain to process
 agg_num_plot = 10  # spatial aggregation for plotting
 agg_num_iso = 50  # spatial aggregation for isostatic adjustment (~4.4 km)
-env_topo_sel = "Elev_curv_8.0"  # select envelope topography
-# (new: "Elev_curv_5.0")
+env_topo_sel = "Elev_curv_5.0"  # select envelope topography
+# (old: "Elev_curv_8.0")
 
 # Region with envelope topography
 env_cen = (26.50, 100.80)  # centre of circle (latitude/longitude) [deg]
@@ -64,13 +64,13 @@ env_rad = 500.0 * 1000.0  # radius of circle [m]
 env_bound = 100.0 * 1000.0  # boundary zone width [m]
 
 # Constants for isostatic adjustment
-rho_m = 3600.0  # mantle density  [kg m-3] (old: 3400.0)
-rho_nsr = 2400.0  # density of near-surface rock [kg m-3] (old: 2500.0)
+rho_m = 3500.0  # mantle density  [kg m-3] (old: 3400.0, 3600.0)
+rho_nsr = 2300.0  # density of near-surface rock [kg m-3] (old: 2500.0, 2400.0)
 rho_fill = 0.0  # infill material density (density of air: ~1.2) [kg m-3]
-g = 9.81  # acceleration due to gravity [m s-2]
-Te = 35000.0  # Elastic thickness [m]
-E = 65E9  # Young's modulus [Pa]
-nu = 0.25  # Poisson's ratio [-]
+g = 9.78  # acceleration due to gravity [m s-2] (old: 9.81)
+Te = 31000.0  # Elastic thickness [m] (old: 35000.0)
+E = 100E9  # Young's modulus [Pa] (old: 65E9)
+nu = 0.27  # Poisson's ratio [-] (old: 0.25)
 
 # Further constants
 rad_earth = 6370997.0  # default PROJ sphere radius [m]

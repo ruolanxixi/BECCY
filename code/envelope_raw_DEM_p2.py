@@ -68,7 +68,7 @@ rho_m = 3500.0  # mantle density  [kg m-3] (old: 3400.0, 3600.0)
 rho_nsr = 2300.0  # density of near-surface rock [kg m-3] (old: 2500.0, 2400.0)
 rho_fill = 0.0  # infill material density (density of air: ~1.2) [kg m-3]
 g = 9.78  # acceleration due to gravity [m s-2] (old: 9.81)
-Te = 31000.0  # Elastic thickness [m] (old: 35000.0)
+Te = 30000.0  # Elastic thickness [m] (old: 35000.0)
 E = 100E9  # Young's modulus [Pa] (old: 65E9)
 nu = 0.27  # Poisson's ratio [-] (old: 0.25)
 

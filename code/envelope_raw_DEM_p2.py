@@ -54,7 +54,7 @@ path_in_out = "/Users/csteger/Dropbox/IAC/Data/Model/BECCY/"
 dom_proc = {"lat": slice(36.5 - 0.0001, 18.0),
             "lon": slice(89.0, 110.0 - 0.0001)}  # MERIT domain to process
 agg_num_plot = 10  # spatial aggregation for plotting
-agg_num_iso = 50  # spatial aggregation for isostatic adjustment (~4.4 km)
+agg_num_iso = 25  # spatial aggregation for isostatic adjustment (~2.3 km)
 env_topo_sel = "Elev_curv_5.0"  # select envelope topography
 # (old: "Elev_curv_8.0")
 
@@ -64,17 +64,41 @@ env_rad = 500.0 * 1000.0  # radius of circle [m]
 env_bound = 100.0 * 1000.0  # boundary zone width [m]
 
 # Constants for isostatic adjustment
-rho_m = 3500.0  # mantle density  [kg m-3] (old: 3400.0, 3600.0)
-rho_nsr = 2300.0  # density of near-surface rock [kg m-3] (old: 2500.0, 2400.0)
+rho_m = 3500.0  # mantle density  [kg m-3] (gFlex: 3300.0, old: 3400.0)
+rho_nsr = 2300.0  # density of near-surface rock [kg m-3] (old: 2500.0)
 rho_fill = 0.0  # infill material density (density of air: ~1.2) [kg m-3]
 g = 9.78  # acceleration due to gravity [m s-2] (old: 9.81)
-Te = 30000.0  # Elastic thickness [m] (old: 35000.0)
-E = 100E9  # Young's modulus [Pa] (old: 65E9)
-nu = 0.27  # Poisson's ratio [-] (old: 0.25)
+Te = 30000.0  # Elastic thickness [m] (old/gFlex: 35000.0)
+E = 100E9  # Young's modulus [Pa] (old/gFlex: 65E9)
+nu = 0.27  # Poisson's ratio [-] (old/gFlex: 0.25)
 
 # Further constants
 rad_earth = 6370997.0  # default PROJ sphere radius [m]
 topo_fill_val = -32767  # MERIT 16-bit integer fill value
+
+# -----------------------------------------------------------------------------
+# References for constants
+# -----------------------------------------------------------------------------
+
+# - g: Chen et al. (2013)
+# - Te: Chen et al. (2014), Wang et al. (2015)
+# - E: Chen et al. (2013), Chen et al. (2014), Ou et al. (2021)
+# - nu: Wang et al. (2017)
+
+# Chen et al. (2013): Variations of the effective elastic thickness over China
+#                     and surroundings and their relation to the lithosphere
+#                     dynamics (http://dx.doi.org/10.1016/j.epsl.2012.12.022)
+# Chen et al. (2014): Elastic thickness, mechanical anisotropy and deformation
+#                     of the southeastern Tibetan Plateau
+#                     (http://dx.doi.org/10.1016/j.tecto.2014.09.007)
+# Ou et al. (2021): Contrasting exhumation histories and relief development
+#                   within the Three Rivers Region (south-east Tibet)
+#                   (https://doi.org/10.5194/se-12-563-2021)
+# Wang et al. (2015): Flexural bending of southern Tibet in a retro foreland
+#                     setting (https://doi.org/10.1038/srep12076)
+# Wang et al. (2017): Crustal thickness and Poisson’s ratio in southwest China
+#                     based on data from dense seismic arrays
+#                     (https://doi.org/10.1002/2017JB013978)
 
 ###############################################################################
 # Load/initialise data and make overview plot

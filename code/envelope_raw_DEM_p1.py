@@ -228,7 +228,7 @@ for i in fac_curv:
 ###############################################################################
 
 # Select experiments
-fac_curv_sel = [1.0, 4.0, 5.0, 6.0, 8.0]
+fac_curv_sel = [1.0, 3.0, 5.0, 7.0]
 
 # Load topographies
 topo_env = {}
@@ -270,8 +270,8 @@ norm_diff = mpl.colors.BoundaryNorm(levels_diff, ncolors=cmap_diff.N,
 lon_2d, lat_2d = np.meshgrid(lon, lat)
 
 # Plot
-# fig = plt.figure(figsize=(11.3, 16.5))  # 4 rows
-fig = plt.figure(figsize=(11.3, 19.5))  # 5 rows
+fig = plt.figure(figsize=(11.6, 16.5))  # 4 rows
+# fig = plt.figure(figsize=(11.3, 19.5))  # 5 rows
 gs = gridspec.GridSpec(len(fac_curv_sel) + 1, 3, left=0.1, bottom=0.1,
                        right=0.9, top=0.9, hspace=0.05, wspace=0.05,
                        height_ratios=[1.0] * len(fac_curv_sel) + [0.06])
@@ -300,16 +300,17 @@ for i in fac_curv_sel:
                 #    expensive to plot
     ind_nodes = data_aux["indices_nodes"]
     data_aux.close()
-    if i in (1.0, 4.0):  # set manually
+    if i in (1.0, 3.0, 4.0):  # set manually
         plt.scatter(lon_2d.ravel()[ind_nodes], lat_2d.ravel()[ind_nodes], s=1,
                     color="black")
     ax.set_aspect("auto")
     plt.axis([lon.min(), lon.max(), lat.min(), lat.max()])
-    plt.text(-0.05, 0.5, "Surface curvature factor: %.1f" % i, fontsize=11,
+    plt.text(-0.05, 0.5, "Curvature factor: %.1f" % i, fontsize=11,
+             fontweight="bold",
              horizontalalignment="center", verticalalignment="center",
              rotation=90, transform=ax.transAxes)
     if count == 0:
-        plt.title("Unaltered topography [m]", fontsize=11, fontweight="bold",
+        plt.title("Present-day topography [m]", fontsize=11, fontweight="bold",
                   y=1.01)
     count += 1
 # -----------------------------------------------------------------------------
@@ -317,9 +318,9 @@ ax = plt.subplot(gs[-1, 0])
 mpl.colorbar.ColorbarBase(ax, cmap=cmap_topo, norm=norm_topo, ticks=ticks_topo,
                           orientation="horizontal")
 # -----------------------------------------------------------------------------
-cmap_red = mpl.colors.ListedColormap(["red"])
+cmap_oc = mpl.colors.ListedColormap(["grey"])
 bounds_red = [0.5, 1.5]
-norm_red = mpl.colors.BoundaryNorm(bounds_red, cmap_red.N)
+norm_red = mpl.colors.BoundaryNorm(bounds_red, cmap_oc.N)
 count = 0
 for i in fac_curv_sel:
     ax = plt.subplot(gs[count, 1], projection=ccrs.PlateCarree())
@@ -327,20 +328,20 @@ for i in fac_curv_sel:
         plt.pcolormesh(lon, lat, topo_env[i], cmap=cmap_topo, norm=norm_topo,
                        shading="auto")
         data_plot = np.ma.masked_where(mask_ocean == 0, np.ones_like(topo))
-        plt.pcolormesh(lon, lat, data_plot, cmap=cmap_red, norm=norm_red,
+        plt.pcolormesh(lon, lat, data_plot, cmap=cmap_oc, norm=norm_red,
                        shading="auto")
     else:
         plt.pcolormesh(lon_agg, lat_agg, topo_env_agg[i], cmap=cmap_topo,
                        norm=norm_topo, shading="auto")
         data_plot = np.ma.masked_where(mask_ocean_agg == 0,
                                        np.ones_like(topo_agg))
-        plt.pcolormesh(lon_agg, lat_agg, data_plot, cmap=cmap_red,
+        plt.pcolormesh(lon_agg, lat_agg, data_plot, cmap=cmap_oc,
                        norm=norm_red, shading="auto")
     ax.set_aspect("auto")
     plt.axis([lon.min(), lon.max(), lat.min(), lat.max()])
     if count == 0:
-        plt.title("Envelope topography [m]", fontsize=11, fontweight="bold",
-                  y=1.01)
+        plt.title("Raw envelope topography [m]", fontsize=11,
+                  fontweight="bold", y=1.01)
     count += 1
 # -----------------------------------------------------------------------------
 count = 0
@@ -378,7 +379,7 @@ lat_trans = [29.3, 27.5, 26.5, 25.5]  # [degree]
 ind_lat = [np.argmin(np.abs(lat - i)) for i in lat_trans]
 
 # Plot
-fig = plt.figure(figsize=(16.0, 14.0))
+fig = plt.figure(figsize=(16.0, 13.5))
 gs = gridspec.GridSpec(len(ind_lat) + 2, 3, left=0.1, bottom=0.1, right=0.9,
                        top=0.9, hspace=0.05, wspace=0.05,
                        height_ratios=[1.0] * len(ind_lat) + [0.2, 1.4],
@@ -403,9 +404,9 @@ for i in ind_lat:
         plt.xlabel("Longitude [$^{\circ}$]")
     if count_trans == 0:
         plt.legend(loc="upper right", frameon=False, fontsize=11,
-                   title="Surface curvature\n factor:", title_fontsize=11,
+                   title="Curvature factor:", title_fontsize=11,
                    ncol=2)
-    t = plt.text(0.07, 0.90, "Latitude: %.2f" % lat[i] + " $^{\circ}$N",
+    t = plt.text(0.07, 0.90, "Latitude: %.2f" % lat[i] + "$^{\circ}$N",
                  fontsize=11,
                  horizontalalignment="center", verticalalignment="center",
                  transform=ax.transAxes, fontweight="bold")
@@ -418,10 +419,10 @@ for i in ind_lat:
 ax = plt.subplot(gs[-1, 1], projection=ccrs.PlateCarree())
 if topo.size <= (2000 * 2000):
     plt.pcolormesh(lon, lat, topo, cmap=cmap_topo, norm=norm_topo,
-                   shading="auto")
+                   shading="auto", rasterized=True)
 else:
     plt.pcolormesh(lon_agg, lat_agg, topo_agg, cmap=cmap_topo, norm=norm_topo,
-                   shading="auto")
+                   shading="auto", rasterized=True)
 for i in ind_lat:
     plt.plot([lon[0], lon[-1]], [lat[i], lat[i]], color="black", lw=2.0)
 gl = ax.gridlines(crs=ccrs.PlateCarree(), linewidth=1, color="black",
@@ -432,7 +433,7 @@ gl.top_labels = False
 gl.right_labels = False
 ax.set_aspect("auto")
 # -----------------------------------------------------------------------------
-fig.savefig(path_plot + "Envelope_convex_hull_cross.png", dpi=300,
+fig.savefig(path_plot + "Envelope_convex_hull_cross.pdf", dpi=300,
             bbox_inches="tight")
 plt.close(fig)
 
@@ -458,8 +459,8 @@ fig = plt.figure(figsize=(6, 8))
 data_plot = ((topo_env_mean / topo_mean) - 1.0) * 100.0
 plt.plot(fac_curv, data_plot, color="dodgerblue", lw=1.5)
 plt.scatter(fac_curv, data_plot, s=30, color="dodgerblue")
-plt.xlabel("Surface curvature factor [-]")
+plt.xlabel("Curvature factor [-]")
 plt.ylabel("Increase in mean elevation of envelope topography [%]", labelpad=8)
-fig.savefig(path_plot + "Surf_curv_fac_vs_mean_elev.png", dpi=300,
+fig.savefig(path_plot + "Curv_fac_vs_mean_elev.png", dpi=300,
             bbox_inches="tight")
 plt.close(fig)

@@ -586,11 +586,11 @@ file_txt.close()
 dom_ext_plot = [92.0, 107.5, 20.5, 34.0]
 
 # Plot
-fig = plt.figure(figsize=(16.5, 10.5))
-gs = gridspec.GridSpec(2, 4, left=0.1, bottom=0.1, right=0.9,
-                       top=0.9, hspace=0.07, wspace=0.05,
-                       width_ratios=[1.0, 1.0, 1.0, 0.05],
-                       height_ratios=[1.0, 1.0])
+fig = plt.figure(figsize=(10.5, 16.0))
+gs = gridspec.GridSpec(4, 2, left=0.1, bottom=0.1, right=0.9,
+                       top=0.9, hspace=0.09, wspace=0.05,
+                       height_ratios=[1.0, 1.0, 1.0, 0.05],
+                       width_ratios=[1.0, 1.0])
 # -----------------------------------------------------------------------------
 ax = plt.subplot(gs[0, 0], projection=ccrs.PlateCarree())
 plt.pcolormesh(data_agg_plot["lon"], data_agg_plot["lat"],
@@ -598,8 +598,8 @@ plt.pcolormesh(data_agg_plot["lon"], data_agg_plot["lat"],
                shading="auto")
 ax.set_aspect("auto")
 ax.set_extent(dom_ext_plot, crs=ccrs.PlateCarree())
-plt.title("Unmodified (modern-day) topography [m]", fontsize=10,
-          fontweight="bold", y=1.005)
+plt.title("Present-day topography", fontsize=10,
+          fontweight="bold", y=1.002)
 plt.scatter(env_cen[1], env_cen[0], s=50, color="red")
 ls = ["-", "--"]
 count = 0
@@ -611,61 +611,84 @@ for i in (env_rad, env_rad + env_bound):
                        edgecolor="red", linewidth=1.2, linestyle=ls[count])
     ax.add_patch(poly)
     count += 1
+plt.text(0.05, 0.95, "(a)", fontsize=10, fontweight="bold",
+         horizontalalignment="center", verticalalignment="center",
+         transform=ax.transAxes)
 # -----------------------------------------------------------------------------
-ax = plt.subplot(gs[0, 1], projection=ccrs.PlateCarree())
+ax = plt.subplot(gs[1, 0], projection=ccrs.PlateCarree())
 plt.pcolormesh(data_agg_plot["lon"], data_agg_plot["lat"],
                data_agg_plot["topo_env"], cmap=cmap_topo, norm=norm_topo,
                shading="auto")
 ax.set_aspect("auto")
 ax.set_extent(dom_ext_plot, crs=ccrs.PlateCarree())
-plt.title("Envelope topography [m]", fontsize=10, fontweight="bold", y=1.005)
+plt.title("Embedded raw envelope topography", fontsize=10,
+          fontweight="bold", y=1.002)
+plt.text(0.05, 0.95, "(c)", fontsize=10, fontweight="bold",
+         horizontalalignment="center", verticalalignment="center",
+         transform=ax.transAxes)
 # -----------------------------------------------------------------------------
-ax = plt.subplot(gs[0, 2], projection=ccrs.PlateCarree())
+ax = plt.subplot(gs[2, 0], projection=ccrs.PlateCarree())
 plt.pcolormesh(data_agg_plot["lon"], data_agg_plot["lat"],
                data_agg_plot["topo_final"], cmap=cmap_topo, norm=norm_topo,
                shading="auto")
 ax.set_aspect("auto")
 ax.set_extent(dom_ext_plot, crs=ccrs.PlateCarree())
-plt.title("Final topography [m]", fontsize=10, fontweight="bold", y=1.005)
+plt.title("Envelope topography", fontsize=10, fontweight="bold", y=1.002)
+plt.text(0.05, 0.95, "(e)", fontsize=10, fontweight="bold",
+         horizontalalignment="center", verticalalignment="center",
+         transform=ax.transAxes)
 # -----------------------------------------------------------------------------
-ax = plt.subplot(gs[0, 3])
-mpl.colorbar.ColorbarBase(ax, cmap=cmap_topo, norm=norm_topo, ticks=ticks_topo,
-                          orientation="vertical")
+ax = plt.subplot(gs[3, 0])
+cbar = mpl.colorbar.ColorbarBase(ax, cmap=cmap_topo, norm=norm_topo,
+                                 ticks=ticks_topo, orientation="horizontal")
+cbar.ax.tick_params(labelsize=10)
+plt.xlabel("Elevation [m]", fontsize=10)
 # -----------------------------------------------------------------------------
 levels_diff = np.arange(-1500.0, 1700.0, 200.0)
 cmap_diff = cm.roma
 norm_diff = mpl.colors.BoundaryNorm(levels_diff, ncolors=cmap_diff.N,
                                     extend="both")
-ax = plt.subplot(gs[1, 0], projection=ccrs.PlateCarree())
+ax = plt.subplot(gs[0, 1], projection=ccrs.PlateCarree())
 plt.pcolormesh(data_agg_plot["lon"], data_agg_plot["lat"],
                (data_agg_plot["topo_env"] - data_agg_plot["topo_raw"]),
                cmap=cmap_diff, norm=norm_diff, shading="auto")
 ax.set_aspect("auto")
 ax.set_extent(dom_ext_plot, crs=ccrs.PlateCarree())
-plt.title("Envelope - unmodified topography [m]", fontsize=10,
-          fontweight="bold", y=1.005)
+plt.title("Difference (embedded raw envelope - present-day)",
+          fontsize=10,  fontweight="bold", y=1.002)
+plt.text(0.05, 0.95, "(b)", fontsize=10, fontweight="bold",
+         horizontalalignment="center", verticalalignment="center",
+         transform=ax.transAxes)
 # -----------------------------------------------------------------------------
 ax = plt.subplot(gs[1, 1], projection=ccrs.PlateCarree())
-plt.pcolormesh(data_agg_plot["lon"], data_agg_plot["lat"],
-               (data_agg_plot["topo_final"] - data_agg_plot["topo_raw"]),
-               cmap=cmap_diff, norm=norm_diff, shading="auto")
-ax.set_aspect("auto")
-ax.set_extent(dom_ext_plot, crs=ccrs.PlateCarree())
-plt.title("Final - unmodified topography [m]", fontsize=10,
-          fontweight="bold", y=1.005)
-# -----------------------------------------------------------------------------
-ax = plt.subplot(gs[1, 2], projection=ccrs.PlateCarree())
 plt.pcolormesh(data_agg_plot["lon"], data_agg_plot["lat"],
                (data_agg_plot["topo_final"] - data_agg_plot["topo_env"]),
                cmap=cmap_diff, norm=norm_diff, shading="auto")
 ax.set_aspect("auto")
 ax.set_extent(dom_ext_plot, crs=ccrs.PlateCarree())
-plt.title("Final - envelope topography [m]", fontsize=10,
-          fontweight="bold", y=1.005)
+plt.title("Difference (envelope - embedded raw envelope)", fontsize=10,
+          fontweight="bold", y=1.002)
+plt.text(0.05, 0.95, "(d)", fontsize=10, fontweight="bold",
+         horizontalalignment="center", verticalalignment="center",
+         transform=ax.transAxes)
 # -----------------------------------------------------------------------------
-ax = plt.subplot(gs[1, 3])
-mpl.colorbar.ColorbarBase(ax, cmap=cmap_diff, norm=norm_diff,
-                          orientation="vertical")
+ax = plt.subplot(gs[2, 1], projection=ccrs.PlateCarree())
+plt.pcolormesh(data_agg_plot["lon"], data_agg_plot["lat"],
+               (data_agg_plot["topo_final"] - data_agg_plot["topo_raw"]),
+               cmap=cmap_diff, norm=norm_diff, shading="auto")
+ax.set_aspect("auto")
+ax.set_extent(dom_ext_plot, crs=ccrs.PlateCarree())
+plt.title("Difference (envelope - present-day)", fontsize=10,
+          fontweight="bold", y=1.002)
+plt.text(0.05, 0.95, "(f)", fontsize=10, fontweight="bold",
+         horizontalalignment="center", verticalalignment="center",
+         transform=ax.transAxes)
+# -----------------------------------------------------------------------------
+ax = plt.subplot(gs[3, 1])
+cbar = mpl.colorbar.ColorbarBase(ax, cmap=cmap_diff, norm=norm_diff,
+                                 orientation="horizontal")
+cbar.ax.tick_params(labelsize=10)
+plt.xlabel("Elevation difference [m]", fontsize=10)
 # -----------------------------------------------------------------------------
 fig.savefig(path_plot + "Envelope_steps.png", dpi=300, bbox_inches="tight")
 plt.close(fig)

@@ -20,7 +20,7 @@ mpl.style.use("classic")
 # Settings
 # -----------------------------------------------------------------------------
 
-# Input files (last glacial maximum (LGM) and present day (PD))
+# Input files (LGM: last glacial maximum, PD: present day)
 extpar_lgm = "/Users/csteger/Downloads/extpar/12km_LGM/" \
              + "extpar_EAS_ext_12km_merit_LGM.nc"
 topo_buffer_lgm = "/Users/csteger/Downloads/extpar/12km_LGM/" \
@@ -36,7 +36,9 @@ extpar_lgm_out = dir_out + "extpar_EAS_ext_12km_merit_LGM_consistent.nc"
 
 # Miscellaneous
 keep_caspian_sea = True  # keep Caspian Sea in LGM
-avoid_new_lakes = True  # treat new separated water bodies as land depressions
+avoid_new_lakes = True
+# treat new water bodies disconnected from the ocean as land depressions
+num_nn = 1  # number of nearest neighbors grid cells to consider (1, 25)
 
 # -----------------------------------------------------------------------------
 # Notes on fields in EXTPAR actually used in COSMO
@@ -102,37 +104,34 @@ ccrs_rot = ccrs.RotatedPole(
     pole_latitude=ds["rotated_pole"].grid_north_pole_latitude,
     pole_longitude=ds["rotated_pole"].grid_north_pole_longitude)
 for i in ("HSURF", "SSO_STDH", "SSO_THETA", "SSO_GAMMA", "SSO_SIGMA", "S_ORO"):
-    flag = np.all(ds[i].values == data_buffer[i])
-    print(i + " identical: " + str(flag))
-    if not flag:
-        data_plot = (ds[i].values - data_buffer[i])
-        data_plot = np.ma.masked_where(data_plot == 0.0, data_plot)
-        plt.figure(figsize=(11, 5))
-        ax = plt.axes(projection=ccrs_rot)
-        plt.pcolormesh(rlon, rlat, data_plot)
-        ax.set_aspect("auto")
-        gl = ax.gridlines(crs=ccrs.PlateCarree(), linewidth=0.5, color="black",
-                          alpha=0.8, linestyle="-", draw_labels=True, dms=True,
-                          x_inline=False, y_inline=False)
-        gl.top_labels = False
-        gl.right_labels = False
-        ax.coastlines(resolution="50m", linewidth=0.5)
-        plt.title(i + ": EXTPAR minus buffer")
-        plt.colorbar()
+    if i in tuple(ds.variables):
+        flag = np.all(ds[i].values == data_buffer[i])
+        print(i + " identical: " + str(flag))
+        if not flag:
+            data_plot = (ds[i].values - data_buffer[i])
+            data_plot = np.ma.masked_where(data_plot == 0.0, data_plot)
+            plt.figure(figsize=(11, 5))
+            ax = plt.axes(projection=ccrs_rot)
+            plt.pcolormesh(rlon, rlat, data_plot)
+            ax.set_aspect("auto")
+            gl = ax.gridlines(crs=ccrs.PlateCarree(), linewidth=0.5,
+                              color="black", alpha=0.8, linestyle="-",
+                              draw_labels=True, dms=True,
+                              x_inline=False, y_inline=False)
+            gl.top_labels = False
+            gl.right_labels = False
+            ax.coastlines(resolution="50m", linewidth=0.5)
+            plt.title(i + ": EXTPAR minus buffer")
+            plt.colorbar()
 ds.close()
 
-# Load EXTPAR data
+# Load EXTPAR data for Last Glacial Maximum
 ds = xr.open_dataset(extpar_lgm)
 fr_land = ds["FR_LAND"].values
 soiltyp = ds["SOILTYP"].values  # 1 - 8: land, 9: water
 hsurf = ds["HSURF"].values
-rlon = ds["rlon"].values
-rlat = ds["rlat"].values
 lon = ds["lon"].values
 lat = ds["lat"].values
-ccrs_rot = ccrs.RotatedPole(
-    pole_latitude=ds["rotated_pole"].grid_north_pole_latitude,
-    pole_longitude=ds["rotated_pole"].grid_north_pole_longitude)
 z0_tot = ds["Z0"].values
 ds.close()
 
@@ -141,9 +140,9 @@ ds = xr.open_dataset(extpar_pd)
 fr_lake = ds["FR_LAKE"].values
 depth_lk = ds["DEPTH_LK"].values
 ds.close()
-# -> 'FR_LAKE' and 'DEPTH_LK' from LGM EXTPAR file are erroneous...
+# -> 'FR_LAKE' and 'DEPTH_LK' from LGM EXTPAR file are erroneous!
 
-# Check consistency between land, sea, lake and soil types in EXTPAR file
+# Check consistency between land, sea, lakes and soil types in EXTPAR file
 print(fr_land[soiltyp == 9].max())  # water
 print(fr_land[soiltyp != 9].min())  # land
 print(np.unique(soiltyp[fr_lake > 0.5]))
@@ -151,8 +150,8 @@ print(np.unique(soiltyp[fr_lake > 0.5]))
 # Recompute total surface roughness
 z0_tot_rec = data_buffer["Z0"] + data_buffer["Z0_TOPO"]
 mask_water = (fr_land < 0.5)
-z0_tot_rec[mask_water] = np.maximum(1.E-6, z0_tot_rec[mask_water])
-z0_tot_rec[~mask_water] = np.maximum(1.E-2, z0_tot_rec[~mask_water])
+z0_tot_rec[mask_water] = np.maximum(1.0e-6, z0_tot_rec[mask_water])
+z0_tot_rec[~mask_water] = np.maximum(1.0e-2, z0_tot_rec[~mask_water])
 print("Z0_tot identical: " + str(np.all(z0_tot == z0_tot_rec)))
 
 # -----------------------------------------------------------------------------
@@ -164,15 +163,16 @@ fr_land_inc = ((data_buffer["FR_LAND_TOPO"] - fr_lake) - fr_land)
 # -> assume lake fraction to remain constant...
 num_gc = (fr_land_inc < 0.0).sum()
 print("Number of grid cells with decreasing land fraction: " + str(num_gc))
-print("Smallest 5 values: "
-      + ", ".join(["%.5f" % i for i in np.sort(fr_land_inc.ravel())[:3]]))
+print("Smallest, 5th- and 9th-smallest value: "
+      + ", ".join(["%.8f" % i for i in
+                   np.sort(fr_land_inc.ravel())[[0, 4, 8]]]))
 # -> ignore grid cells with decreasing fractions...
 if keep_caspian_sea:
     mask_caspian_sea = (hsurf != data_buffer["HSURF"])
     fr_land_inc[mask_caspian_sea] = 0.0
 fr_land_lgm = (fr_land + fr_land_inc)
-fr_land_bin = (fr_land >= 0.5).astype(np.int32)
 fr_land_lgm_bin = (fr_land_lgm >= 0.5).astype(np.int32)
+fr_land_bin = (fr_land >= 0.5).astype(np.int32)
 mask_fill = np.zeros(fr_land.shape, dtype=bool)
 if avoid_new_lakes:
     binary = (~(fr_land_lgm_bin - fr_land_bin).astype(bool)).astype(int)
@@ -189,9 +189,9 @@ if avoid_new_lakes:
 
 # Plot land fractions (PD and LGM)
 # -----------------------------------------------------------------------------
-fig = plt.figure(figsize=(16, 11))
+fig = plt.figure(figsize=(16, 10))
 gs = gridspec.GridSpec(2, 3, left=0.1, bottom=0.1, right=0.9,
-                       top=0.9, hspace=0.125, wspace=0.1,
+                       top=0.9, hspace=0.11, wspace=0.1,
                        width_ratios=[1.0, 1.0, 0.05])
 # -----------------------------------------------------------------------------
 levels = np.arange(0.0, 1.0, 0.05)
@@ -200,26 +200,16 @@ norm = mpl.colors.BoundaryNorm(levels, ncolors=cmap.N)
 ax = plt.subplot(gs[0, 0], projection=ccrs_rot)
 plt.pcolormesh(rlon, rlat, fr_land, cmap=cmap, norm=norm)
 ax.set_aspect("auto")
-gl = ax.gridlines(crs=ccrs.PlateCarree(), linewidth=0.5, color="black",
-                  alpha=0.8, linestyle="-", draw_labels=True, dms=True,
-                  x_inline=False, y_inline=False)
-gl.top_labels = False
-gl.right_labels = False
 ax.coastlines(resolution="50m", linewidth=0.5)
 plt.title("Fractional land coverage (present-day)", fontsize=12,
-          fontweight="bold", y=1.005)
+          fontweight="bold", y=1.01)
 # -----------------------------------------------------------------------------
 ax = plt.subplot(gs[1, 0], projection=ccrs_rot)
 plt.pcolormesh(rlon, rlat, fr_land_lgm, cmap=cmap, norm=norm)
 ax.set_aspect("auto")
-gl = ax.gridlines(crs=ccrs.PlateCarree(), linewidth=0.5, color="black",
-                  alpha=0.8, linestyle="-", draw_labels=True, dms=True,
-                  x_inline=False, y_inline=False)
-gl.top_labels = False
-gl.right_labels = False
 ax.coastlines(resolution="50m", linewidth=0.5)
 plt.title("Fractional land coverage (Last Glacial Maximum)", fontsize=12,
-          fontweight="bold", y=1.005)
+          fontweight="bold", y=1.01)
 # -----------------------------------------------------------------------------
 levels = np.arange(0.0, 1.0, 0.05)
 cmap = plt.get_cmap("Blues")
@@ -227,15 +217,9 @@ norm = mpl.colors.BoundaryNorm(levels, ncolors=cmap.N)
 ax = plt.subplot(gs[0, 1], projection=ccrs_rot)
 plt.pcolormesh(rlon, rlat, fr_land_inc, cmap=cmap, norm=norm)
 ax.set_aspect("auto")
-gl = ax.gridlines(crs=ccrs.PlateCarree(), linewidth=0.5, color="black",
-                  alpha=0.8, linestyle="-", draw_labels=True, dms=True,
-                  x_inline=False, y_inline=False)
-gl.top_labels = False
-gl.left_labels = False
-gl.right_labels = False
 ax.coastlines(resolution="50m", linewidth=0.5)
 plt.title("Difference in fractional land coverage", fontsize=12,
-          fontweight="bold", y=1.005)
+          fontweight="bold", y=1.01)
 # -----------------------------------------------------------------------------
 cmap = mpl.colors.ListedColormap(["white", "forestgreen", "orangered"])
 bounds = [-0.5, 0.5, 1.5, 2.5]
@@ -245,21 +229,15 @@ data_plot = fr_land_lgm_bin.copy()
 data_plot[mask_fill] = 2
 plt.pcolormesh(rlon, rlat, data_plot, cmap=cmap, norm=norm)
 ax.set_aspect("auto")
-gl = ax.gridlines(crs=ccrs.PlateCarree(), linewidth=0.5, color="black",
-                  alpha=0.8, linestyle="-", draw_labels=True, dms=True,
-                  x_inline=False, y_inline=False)
-gl.top_labels = False
-gl.left_labels = False
-gl.right_labels = False
 ax.coastlines(resolution="50m", linewidth=0.5)
 plt.title("Binary land coverage (Last Glacial Maximum)", fontsize=12,
-          fontweight="bold", y=1.005)
+          fontweight="bold", y=1.01)
 # -----------------------------------------------------------------------------
 fig.savefig(dir_out + "Land_fractions.png", dpi=300, bbox_inches="tight")
 plt.close(fig)
 
 # -----------------------------------------------------------------------------
-# Fill land (surface) characteristics from nearest neighbour land cell
+# Modify/adapt grid cells
 # -----------------------------------------------------------------------------
 
 # Variables already modified (-> derived from modified MERIT DEM)
@@ -284,10 +262,10 @@ var_fill_nn = (
     )  # (20)
 
 # Remaining variables
-# - FR_LAND from data_buffer["FR_LAND_TOPO"] (1)
-# - Z0 (1) recompute from data_buffer["Z0"], data_buffer["Z0_TOPO"] (1)
-# - URBAN -> set to 0.0 everywhere (1)
-# - FR_LAKE, DEPTH_K -> replace from unmodified EXTPAR file (2)
+# - FR_LAND: from data_buffer["FR_LAND_TOPO"] (1)
+# - Z0: recompute from data_buffer["Z0"], data_buffer["Z0_TOPO"] (1)
+# - URBAN: set to 0.0 everywhere (1)
+# - FR_LAKE, DEPTH_K:  replace from unmodified EXTPAR file (2)
 
 # Construct k-d tree
 crs_ecef = CRS.from_dict({"proj": "geocent", "ellps": "sphere"})
@@ -306,44 +284,45 @@ indices_gc_change = np.where(mask_gc_change)
 pts_new = np.vstack([x_ecef[indices_gc_change],
                      y_ecef[indices_gc_change],
                      z_ecef[indices_gc_change]]).transpose()
-dist, ind_nn = tree.query(pts_new, k=1)
+dist, ind_nn = tree.query(pts_new, k=num_nn)
+if num_nn == 1:
+    dist = dist[:, np.newaxis]
+    ind_nn = ind_nn[:, np.newaxis]
 
 # Plot nearest-neighbour distance
 levels = np.arange(0.0, 450.0, 50.0)
 cmap = plt.get_cmap("Spectral_r")
 norm = mpl.colors.BoundaryNorm(levels, ncolors=cmap.N, extend="max")
-plt.figure(figsize=(11, 6))
+fig = plt.figure(figsize=(11, 6))
 ax = plt.axes(projection=ccrs_rot)
 dist_arr_2d = np.empty(mask_gc_change.shape, dtype=np.float32)
 dist_arr_2d.fill(np.nan)
-dist_arr_2d[mask_gc_change] = dist / 1000.0  # [km]
+dist_arr_2d[mask_gc_change] = dist.mean(axis=1) / 1000.0  # [km]
 plt.pcolormesh(rlon, rlat, dist_arr_2d, cmap=cmap, norm=norm)
 # ax.set_aspect("auto")
-gl = ax.gridlines(crs=ccrs.PlateCarree(), linewidth=0.5, color="black",
-                  alpha=0.8, linestyle="-", draw_labels=True, dms=True,
-                  x_inline=False, y_inline=False)
-gl.top_labels = False
-gl.right_labels = False
 ax.coastlines(resolution="50m", linewidth=0.5)
-plt.title("Nearest land grid cell (distance along chord line) [km]",
+plt.title("Distance to nearest land grid cell(s) (along chord line) [km]",
           fontsize=12, fontweight="bold", y=1.01)
 plt.colorbar()
+fig.savefig(dir_out + "Grid_cell_nearest_neighbour_distance.png",
+            dpi=300, bbox_inches="tight")
+plt.close(fig)
 
 # Fill or recompute variables
 ds = xr.open_dataset(extpar_lgm)
-var_not_found = set(var_fill_nn) - set(ds.keys())
+var_not_found = set(var_fill_nn) - set(ds.data_vars)
 if len(var_not_found) != 0:
     print("Warning: not all variables are present in the EXTPAR file")
     var_fill_nn = set(var_fill_nn).intersection(set(ds.keys()))
 for i in range(mask_gc_change.sum()):
 
     # Indices of grid cell that is modified
-    ind_0, ind_1 = indices_gc_change[0][i], indices_gc_change[1][i]
-    # print(ind_0, ind_1)
+    ind_0 = indices_gc_change[0][i]
+    ind_1 = indices_gc_change[1][i]
 
-    # Indices of nearest neighbour land grid cell
-    ind_nn_0, ind_nn_1 = indices_rep[0][ind_nn[i]], indices_rep[1][ind_nn[i]]
-    # print(ind_nn_0, ind_nn_1)
+    # Indices of nearest neighbour land grid cell(s)
+    ind_nn_0 = indices_rep[0][ind_nn[i, :]]
+    ind_nn_1 = indices_rep[1][ind_nn[i, :]]
 
     # Fill-in land variables in case grid cell turns from water to land
     fr_land_new = (ds["FR_LAND"].values[ind_0, ind_1]
@@ -351,12 +330,19 @@ for i in range(mask_gc_change.sum()):
     if (soiltyp[ind_0, ind_1] == 9) and (fr_land_new >= 0.5):
         # ---------------------------------------------------------------------
         for j in var_fill_nn:
-            ds[j].values[..., ind_0, ind_1] \
-                = ds[j].values[..., ind_nn_0, ind_nn_1]
+            if j != "SOILTYP":
+                ds[j].values[..., ind_0, ind_1] \
+                    = ds[j].values[..., ind_nn_0, ind_nn_1].mean(axis=-1)
+            else:
+                unique, unique_counts \
+                    = np.unique(ds[j].values[ind_nn_0, ind_nn_1],
+                                return_counts=True)
+                ds[j].values[..., ind_0, ind_1] \
+                    = unique[np.argmax(unique_counts)]
         # ---------------------------------------------------------------------
-        z0_tot_rec = data_buffer["Z0"][ind_nn_0, ind_nn_1] \
+        z0_tot_rec = data_buffer["Z0"][ind_nn_0, ind_nn_1].mean(axis=-1) \
             + data_buffer["Z0_TOPO"][ind_0, ind_1]
-        ds["Z0"].values[ind_0, ind_1] = np.maximum(1.E-2, z0_tot_rec)
+        ds["Z0"].values[ind_0, ind_1] = np.maximum(1.0e-2, z0_tot_rec)
 
     # Update land fraction
     ds["FR_LAND"].values[ind_0, ind_1] = fr_land_new
@@ -370,7 +356,9 @@ ds["URBAN"].values[:] = 0.0
 ds["FR_LAKE"].values[:] = fr_lake
 ds["DEPTH_LK"].values[:] = depth_lk
 
-ds.to_netcdf(extpar_lgm_out)
+ds.to_netcdf(extpar_lgm_out,
+             encoding={"time": {"_FillValue": None},
+                       "mlev": {"_FillValue": None}})
 
 # -----------------------------------------------------------------------------
 # Brief 'sanity check' of final EXTPAR file
@@ -380,4 +368,10 @@ ds = xr.open_dataset(extpar_lgm_out)
 print(ds["FR_LAND"].values[ds["SOILTYP"].values == 9].max())  # water
 print(ds["FR_LAND"].values[ds["SOILTYP"].values != 9].min())  # land
 print(np.unique(ds["SOILTYP"].values[ds["FR_LAKE"].values > 0.5]))
+print(np.all(np.isfinite(ds["T_CL"].values[ds["SOILTYP"].values != 9])))
+mask_land = (ds["SOILTYP"].values > 1) & (ds["SOILTYP"].values < 9)
+print(np.all(ds["PLCOV_MX"].values[mask_land] > 0.0))
+print(np.all(ds["LAI_MN"].values[mask_land] > 0.0))
+print(np.all(ds["LAI_MX"].values[mask_land] > 0.0))
+print(np.unique(ds["SOILTYP"].values))
 ds.close()

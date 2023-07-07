@@ -9,7 +9,7 @@
 !
 ! Create conda environment with Fortran compiler:
 ! conda create -n fortran \
-!   numpy matplotlib fortran-compiler ipython -c conda-forge
+!   numpy matplotlib skyfield fortran-compiler ipython -c conda-forge
 !
 ! Author: Christian Steger, July 2023
 
